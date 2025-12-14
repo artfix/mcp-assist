@@ -1,0 +1,10 @@
+{
+  "name": "MCP Assist",
+  "content_in_root": false,
+  "filename": "mcp_assist",
+  "country": ["US"],
+  "render_readme": true,
+  "domains": ["conversation"],
+  "iot_class": "Local Polling",
+  "version": "0.2.0"
+}
