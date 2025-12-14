@@ -27,6 +27,7 @@ from .const import (
     DOMAIN,
     CONF_PROFILE_NAME,
     CONF_SERVER_TYPE,
+    CONF_API_KEY,
     CONF_LMSTUDIO_URL,
     CONF_MODEL_NAME,
     CONF_MCP_PORT,
@@ -43,6 +44,10 @@ from .const import (
     CONF_DEBUG_MODE,
     CONF_ENABLE_CUSTOM_TOOLS,
     CONF_BRAVE_API_KEY,
+    SERVER_TYPE_LMSTUDIO,
+    SERVER_TYPE_OLLAMA,
+    SERVER_TYPE_OPENAI,
+    SERVER_TYPE_GEMINI,
     DEFAULT_SERVER_TYPE,
     DEFAULT_LMSTUDIO_URL,
     DEFAULT_OLLAMA_URL,
@@ -60,6 +65,11 @@ from .const import (
     DEFAULT_DEBUG_MODE,
     DEFAULT_ENABLE_CUSTOM_TOOLS,
     DEFAULT_BRAVE_API_KEY,
+    DEFAULT_API_KEY,
+    OPENAI_BASE_URL,
+    GEMINI_BASE_URL,
+    OPENAI_MODELS,
+    GEMINI_MODELS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,6 +108,8 @@ STEP_USER_DATA_SCHEMA = vol.Schema({
             options=[
                 {"value": "lmstudio", "label": "LM Studio"},
                 {"value": "ollama", "label": "Ollama"},
+                {"value": "openai", "label": "OpenAI"},
+                {"value": "gemini", "label": "Google Gemini"},
             ],
             mode=SelectSelectorMode.LIST,
         )
