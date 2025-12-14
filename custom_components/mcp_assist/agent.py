@@ -153,10 +153,10 @@ class LMStudioMCPAgent(AbstractConversationAgent):
             messages = self._build_messages(system_prompt, user_input.text, history)
             _LOGGER.debug("Messages built: %d messages", len(messages))
 
-            # Call LM Studio
-            _LOGGER.info("📡 Calling LM Studio API...")
+            # Call LLM API
+            _LOGGER.info(f"📡 Calling {self.server_type} API...")
             response_text = await self._call_lmstudio(messages)
-            _LOGGER.info("✅ LM Studio response received, length: %d", len(response_text))
+            _LOGGER.info(f"✅ {self.server_type} response received, length: %d", len(response_text))
 
             # Parse response and execute any Home Assistant actions
             actions_taken = await self._execute_actions(response_text, user_input)
@@ -675,8 +675,8 @@ class LMStudioMCPAgent(AbstractConversationAgent):
             return {}
 
     async def _call_lmstudio_streaming(self, messages: List[Dict[str, Any]]) -> str:
-        """Stream LM Studio responses with immediate TTS feedback."""
-        _LOGGER.info("🚀 Starting streaming LM Studio conversation")
+        """Stream LLM responses with immediate TTS feedback."""
+        _LOGGER.info(f"🚀 Starting streaming {self.server_type} conversation")
 
         # Test streaming once and cache result
         if not hasattr(self, '_streaming_available'):
@@ -929,8 +929,8 @@ class LMStudioMCPAgent(AbstractConversationAgent):
             return await self._call_lmstudio_http(messages)
 
     async def _call_lmstudio_http(self, messages: List[Dict[str, Any]]) -> str:
-        """Original HTTP-based LM Studio call (fallback)."""
-        _LOGGER.info("🚀 Using HTTP fallback for LM Studio")
+        """Original HTTP-based LLM call (fallback)."""
+        _LOGGER.info(f"🚀 Using HTTP fallback for {self.server_type}")
 
         # Get MCP tools once
         tools = await self._get_mcp_tools()
@@ -942,7 +942,7 @@ class LMStudioMCPAgent(AbstractConversationAgent):
 
         # Tool execution loop
         for iteration in range(self.max_iterations):
-            _LOGGER.info(f"🔄 HTTP Iteration {iteration + 1}: Calling LM Studio with {len(conversation_messages)} messages")
+            _LOGGER.info(f"🔄 HTTP Iteration {iteration + 1}: Calling {self.server_type} with {len(conversation_messages)} messages")
 
             payload = {
                 "model": self.model_name,
@@ -995,12 +995,12 @@ class LMStudioMCPAgent(AbstractConversationAgent):
                 async with session.post(url, headers=headers, json=clean_payload) as response:
                     if response.status != 200:
                         error_text = await response.text()
-                        raise Exception(f"LM Studio API error {response.status}: {error_text}")
+                        raise Exception(f"{self.server_type} API error {response.status}: {error_text}")
 
                     data = await response.json()
 
                     if "choices" not in data or not data["choices"]:
-                        raise Exception("No response from LM Studio")
+                        raise Exception(f"No response from {self.server_type}")
 
                     choice = data["choices"][0]
                     message = choice.get("message", {})
@@ -1008,7 +1008,7 @@ class LMStudioMCPAgent(AbstractConversationAgent):
                     # Check if there are tool calls to execute
                     if "tool_calls" in message and message["tool_calls"]:
                         tool_calls = message["tool_calls"]
-                        _LOGGER.info(f"🛠️ LM Studio requested {len(tool_calls)} tool calls")
+                        _LOGGER.info(f"🛠️ {self.server_type} requested {len(tool_calls)} tool calls")
 
                         # Ensure each tool_call has the required type field
                         for tc in tool_calls:
