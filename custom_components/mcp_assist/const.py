@@ -29,6 +29,7 @@ CONF_DEBUG_MODE = "debug_mode"
 CONF_ENABLE_CUSTOM_TOOLS = "enable_custom_tools"
 CONF_BRAVE_API_KEY = "brave_api_key"
 CONF_ALLOWED_IPS = "allowed_ips"
+CONF_ENABLE_GAP_FILLING = "enable_gap_filling"
 
 # Default values
 DEFAULT_SERVER_TYPE = "lmstudio"
@@ -55,6 +56,7 @@ DEFAULT_DEBUG_MODE = False
 DEFAULT_ENABLE_CUSTOM_TOOLS = False
 DEFAULT_BRAVE_API_KEY = ""
 DEFAULT_ALLOWED_IPS = ""
+DEFAULT_ENABLE_GAP_FILLING = True
 
 # MCP Server settings
 MCP_SERVER_NAME = "ha-entity-discovery"
@@ -73,11 +75,23 @@ DEFAULT_TECHNICAL_PROMPT = """You are controlling a Home Assistant smart home sy
 - This applies EVERY TIME - even for follow-up questions about different entities
 
 ## Available Tools
-- **discover_entities**: find devices by name/area/domain/state (ALWAYS use first)
+- **get_index**: Get system structure (areas, domains, device_classes, people, etc.) - Call ONCE at conversation start
+- **discover_entities**: find devices by name/area/domain/device_class/state (ALWAYS use for specific queries)
 - **perform_action**: control devices using discovered entity IDs
 - **get_entity_details**: check states using discovered entity IDs
 - **list_areas/list_domains**: list available areas and device types
 - **set_conversation_state**: indicate if expecting user response
+
+## Smart Query Strategy (NEW)
+For complex queries, use the index for efficient discovery:
+1. FIRST: Call get_index() once to understand system structure
+2. Read device_classes from index to know what sensors exist
+3. THEN: Use discover_entities with device_class filter for targeted queries
+
+Examples:
+- "Is there a leak?" → Check index for moisture/volume_flow_rate device_classes → discover_entities(device_class="moisture")
+- "How's air quality?" → Check index for carbon_dioxide/pm25/aqi counts → discover_entities(device_class=["carbon_dioxide", "pm25"])
+- "Who is home?" → Check index for people list → discover_entities(domain="person", state="home")
 
 ## Discovery Strategy
 For ANY device request:

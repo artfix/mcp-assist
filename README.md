@@ -6,9 +6,10 @@ A Home Assistant conversation agent that uses MCP (Model Context Protocol) for e
 
 - ✅ **95% Token Reduction**: Uses MCP tools for dynamic entity discovery instead of sending all entities
 - ✅ **No Entity Dumps**: Never sends 12,000+ token entity lists to the LLM
+- ✅ **Smart Entity Index**: Pre-generated system structure index (~400-800 tokens) for context-aware queries
 - ✅ **Multi-Platform Support**: Works with LM Studio, Ollama, OpenAI, and Google Gemini
 - ✅ **Multi-turn Conversations**: Maintains conversation context and history
-- ✅ **Dynamic Discovery**: Finds entities by area, type, state, or name on-demand
+- ✅ **Dynamic Discovery**: Finds entities by area, type, device_class, state, or name on-demand
 - ✅ **Web Search Tools**: Optional Brave Search integration for current information
 - ✅ **Works with 1000+ Entities**: Efficient even with large Home Assistant installations
 - ✅ **Multi-Profile Support**: Run multiple conversation agents with different models
@@ -28,14 +29,16 @@ Instead of dumping all entities, MCP Assist:
 
 1. **Starts an MCP Server** on Home Assistant that exposes entity discovery tools
 2. **Your LLM connects** to the MCP server and gets access to these tools:
-   - `discover_entities` - Find entities by type, area, domain, or state
+   - `get_index` - Get system structure index (areas, domains, device_classes, people, etc.)
+   - `discover_entities` - Find entities by type, area, domain, device_class, or state
    - `get_entity_details` - Get current state and attributes
    - `perform_action` - Control devices
    - `list_areas` - List all areas in your home
    - `list_domains` - List all entity types
    - `set_conversation_state` - Smart follow-up handling
-3. **LLM discovers on-demand** - Only fetches the entities it needs for each request
-4. **Token usage drops** from 12,000+ to ~400 tokens per request
+3. **LLM uses the index for smart queries** - Understands what exists without full context dump
+4. **LLM discovers on-demand** - Only fetches the entities it needs for each request
+5. **Token usage drops** from 12,000+ to ~400 tokens per request
 
 ## Token Usage Comparison
 
@@ -44,6 +47,75 @@ Instead of dumping all entities, MCP Assist:
 | **Traditional** | 12,000+ tokens | Sends all entity states |
 | **MCP Assist** | ~400 tokens | Uses MCP tools for discovery |
 | **Reduction** | **95%** | Massive efficiency gain |
+
+## Smart Entity Index (v0.5.0+)
+
+The Smart Entity Index is a pre-generated system structure overview that enables context-aware entity discovery without dumping full entity lists.
+
+### What's in the Index?
+
+The index provides a lightweight (~400-800 tokens) snapshot of your Home Assistant system:
+- **Areas** with entity counts (e.g., "Kitchen: 41 entities")
+- **Domains** with counts (e.g., "sensor: 180, light: 31")
+- **Device Classes** grouped by domain (e.g., "sensor.temperature: 32, binary_sensor.door: 23")
+- **People** registered in your home
+- **Calendars, Zones, Automations, Scripts** available
+- **Input Helpers** for manual controls
+
+### How It Works
+
+1. **Index Generated at Startup** - Automatically created when MCP Assist loads
+2. **Auto-Refresh on Changes** - Updates when entities are added/removed (60-second debounce)
+3. **LLM Calls get_index()** - Retrieves the index once at conversation start
+4. **Smart Queries** - LLM uses device_class information to make targeted discover_entities calls
+
+### Gap-Filling for Uncommon Devices
+
+Many entities don't have a standardized `device_class` (especially custom integrations and uncommon devices). The Smart Entity Index includes **LLM-powered gap-filling** to categorize these entities:
+
+**How Gap-Filling Works**:
+1. Identifies entities without `device_class` attributes
+2. Extracts common naming patterns (e.g., `*_person_detected`, `*_ble_area`)
+3. Groups similar entities together
+4. Uses your configured LLM to infer semantic categories
+5. Adds these as "inferred_types" in the index
+
+**Example**:
+```
+Entities found: sensor.front_door_person_detected, sensor.backyard_person_detected
+Pattern: *_person_detected (2 entities)
+LLM inference: "person_detection_sensor"
+Index entry: "inferred_types.person_detection_sensor: 2"
+```
+
+**Benefits**:
+- Works with **any** custom integration or device
+- Automatically adapts to your specific setup
+- No manual configuration needed
+- Can be disabled in Advanced Settings if not needed
+
+**Privacy**: Gap-filling uses your configured conversation agent (local or cloud), respecting your privacy preferences.
+
+### Example: "Do we have a leak?"
+
+**Without Index:**
+- LLM searches for "leak" in entity names → might miss water flow sensors
+- Multiple trial-and-error queries
+
+**With Index:**
+```
+LLM reads index → sees binary_sensor.moisture: 5, sensor.volume_flow_rate: 1
+LLM knows: leak detection = moisture sensors + water flow
+LLM queries: discover_entities(device_class="moisture")
+Result: 5 moisture sensors found, current states checked
+```
+
+### Benefits
+
+- **Faster queries** - LLM knows what to search for
+- **More accurate** - Uses standardized device_class vocabulary
+- **Token efficient** - ~800 tokens for index vs ~15k for full dump
+- **Works with any HA setup** - Automatically adapts to your devices
 
 ## Requirements
 
@@ -239,6 +311,7 @@ Instead of dumping all entities, MCP Assist:
   - **Smart** (default): LLM decides if follow-up needed
   - **Always**: Always wait for follow-up
   - **None**: Never wait for follow-up
+- **Enable Smart Entity Index**: Context-aware entity discovery with automatic gap-filling for uncommon devices (default: enabled)
 
 ### MCP Server Settings
 - **MCP Server Port**: Default 8090 (change if port conflict)
@@ -389,7 +462,15 @@ This integration is open source. Contributions are welcome!
 
 The integration exposes these MCP tools to your LLM:
 
-- **discover_entities**: Find entities by name, area, domain, or state
+- **get_index**: Get system structure index (areas, domains, device_classes, people, pets, calendars, zones)
+- **discover_entities**: Find entities by:
+  - `name_contains` - Search by friendly name
+  - `area` - Filter by location
+  - `domain` - Filter by entity type (light, sensor, etc.)
+  - `device_class` - Filter by device class (temperature, door, etc.)
+  - `name_pattern` - Wildcard pattern matching (e.g., `*_person_detected`)
+  - `inferred_type` - Use LLM-inferred categories from index
+  - `state` - Filter by current state
 - **get_entity_details**: Get detailed state and attributes for specific entities
 - **perform_action**: Control devices (turn_on, turn_off, set_temperature, etc.)
 - **list_areas**: List all areas with entity counts

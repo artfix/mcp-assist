@@ -11,6 +11,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .const import DOMAIN, CONF_MCP_PORT, DEFAULT_MCP_PORT
 from .mcp_server import MCPServer
 from .agent import MCPAssistAgent
+from .index_manager import IndexManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,12 +26,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     try:
-        # Handle shared MCP server
+        # Handle shared MCP server and index manager
         if "shared_mcp_server" not in hass.data[DOMAIN]:
-            # First entry - create shared MCP server
+            # First entry - create shared MCP server and index manager
             mcp_port = entry.data.get(CONF_MCP_PORT, DEFAULT_MCP_PORT)
             _LOGGER.info("Creating shared MCP server on port %d", mcp_port)
 
+            # Create and start index manager
+            index_manager = IndexManager(hass)
+            await index_manager.start()
+            hass.data[DOMAIN]["index_manager"] = index_manager
+
+            # Create and start MCP server
             mcp_server = MCPServer(hass, mcp_port, entry)
             await mcp_server.start()
 
@@ -38,7 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.data[DOMAIN]["mcp_refcount"] = 0
             hass.data[DOMAIN]["mcp_port"] = mcp_port
 
-            _LOGGER.info("✅ Shared MCP server created successfully")
+            _LOGGER.info("✅ Shared MCP server and index manager created successfully")
         else:
             # Reuse existing MCP server
             mcp_port = hass.data[DOMAIN]["mcp_port"]
@@ -95,12 +102,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         refcount = hass.data[DOMAIN]["mcp_refcount"]
         _LOGGER.debug("MCP server refcount after unload: %d", refcount)
 
-        # Only stop MCP server when last profile is removed
+        # Only stop MCP server and index manager when last profile is removed
         if refcount <= 0:
-            _LOGGER.info("Last profile removed - stopping shared MCP server")
+            _LOGGER.info("Last profile removed - stopping shared MCP server and index manager")
             mcp_server = hass.data[DOMAIN].pop("shared_mcp_server", None)
             if mcp_server:
                 await mcp_server.stop()
+            hass.data[DOMAIN].pop("index_manager", None)
             hass.data[DOMAIN].pop("mcp_port", None)
             hass.data[DOMAIN].pop("mcp_refcount", None)
         else:

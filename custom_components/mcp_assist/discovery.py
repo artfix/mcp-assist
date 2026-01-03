@@ -5,9 +5,10 @@ pattern recognition, and structured results optimized for LLM interaction.
 """
 
 import asyncio
+import fnmatch
 import logging
 import re
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from enum import Enum
 
 from homeassistant.core import HomeAssistant
@@ -74,11 +75,27 @@ class SmartDiscovery:
         domain: Optional[str] = None,
         state: Optional[str] = None,
         name_contains: Optional[str] = None,
-        limit: int = 20
+        limit: int = 20,
+        device_class: Optional[Union[str, List[str]]] = None,
+        name_pattern: Optional[str] = None,
+        inferred_type: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Smart entity discovery with relationship understanding.
 
         This is the main entry point that routes to appropriate discovery strategy.
+
+        Args:
+            entity_type: Entity type (deprecated, use domain)
+            area: Area name to filter by
+            domain: Domain to filter by (e.g., 'sensor', 'light')
+            state: State to filter by (e.g., 'on', 'off')
+            name_contains: Substring to search for in entity names
+            limit: Maximum number of entities to return
+            device_class: Device class to filter by (e.g., 'temperature', 'motion')
+                         Can be a single string or list of strings for OR logic
+            name_pattern: Wildcard pattern to match entity IDs (e.g., '*_person_detected')
+            inferred_type: Inferred entity type from the index (e.g., 'person_detection')
+                          Looks up the pattern from the index and applies it
         """
         # Detect query type and intent
         query_type = self._detect_query_type(
@@ -89,18 +106,18 @@ class SmartDiscovery:
         _LOGGER.debug(f"Detected query type: {query_type}, name_contains: {name_contains}")
 
         # Route to appropriate discovery method
-        if query_type == QueryType.PERSON and name_contains:
+        if query_type == QueryType.PERSON and name_contains and not device_class and not name_pattern and not inferred_type:
             return await self._discover_person_entities(name_contains, limit)
-        elif query_type == QueryType.PET and name_contains:
+        elif query_type == QueryType.PET and name_contains and not device_class and not name_pattern and not inferred_type:
             return await self._discover_pet_entities(name_contains, limit)
-        elif query_type == QueryType.AGGREGATE:
+        elif query_type == QueryType.AGGREGATE and not device_class and not name_pattern and not inferred_type:
             return await self._discover_aggregate_entities(domain, state, limit)
-        elif area:
+        elif area and not device_class and not name_pattern and not inferred_type:
             return await self._discover_area_entities(area, domain, state, limit)
         else:
-            # Fall back to general discovery
+            # Fall back to general discovery (handles device_class, name_pattern, and inferred_type)
             return await self._discover_general_entities(
-                entity_type, area, domain, state, name_contains, limit
+                entity_type, area, domain, state, name_contains, limit, device_class, name_pattern, inferred_type
             )
 
     def _detect_query_type(
@@ -438,9 +455,29 @@ class SmartDiscovery:
         domain: Optional[str],
         state: Optional[str],
         name_contains: Optional[str],
-        limit: int
+        limit: int,
+        device_class: Optional[Union[str, List[str]]] = None,
+        name_pattern: Optional[str] = None,
+        inferred_type: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """General entity discovery with enhanced search."""
+        # Handle inferred_type by looking up pattern from index
+        if inferred_type and not name_pattern:
+            from .const import DOMAIN
+            index_manager = self.hass.data.get(DOMAIN, {}).get("index_manager")
+            if index_manager:
+                index = await index_manager.get_index()
+                inferred_types = index.get("inferred_types", {})
+                if inferred_type in inferred_types:
+                    pattern_data = inferred_types[inferred_type]
+                    name_pattern = pattern_data.get("pattern")
+                    _LOGGER.debug("Inferred type '%s' mapped to pattern '%s'",
+                                 inferred_type, name_pattern)
+                else:
+                    _LOGGER.warning("Inferred type '%s' not found in index", inferred_type)
+            else:
+                _LOGGER.warning("Index manager not available for inferred_type lookup")
+
         entities = []
         area_registry = ar.async_get(self.hass)
         entity_registry = er.async_get(self.hass)
@@ -502,6 +539,22 @@ class SmartDiscovery:
                             break
 
                 if not found_match:
+                    continue
+
+            # Device class filter
+            if device_class:
+                entity_device_class = state_obj.attributes.get('device_class')
+
+                # Convert single device_class to list for uniform handling
+                device_class_list = [device_class] if isinstance(device_class, str) else device_class
+
+                # Check if entity's device_class matches any in the list (OR logic)
+                if entity_device_class not in device_class_list:
+                    continue
+
+            # Name pattern filter (wildcard matching)
+            if name_pattern:
+                if not fnmatch.fnmatch(entity_id, name_pattern):
                     continue
 
             # Get area information

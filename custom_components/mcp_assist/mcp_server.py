@@ -584,7 +584,7 @@ class MCPServer:
         tools = [
             {
                 "name": "discover_entities",
-                "description": "Find and list Home Assistant entities by various criteria like area, type, domain, or current state. Use this to discover what devices are available before trying to control them.",
+                "description": "Find and list Home Assistant entities by various criteria like area, type, domain, device_class, or current state. Use this to discover what devices are available before trying to control them.",
                 "inputSchema": {
                     "$schema": "http://json-schema.org/draft-07/schema#",
                     "type": "object",
@@ -608,6 +608,21 @@ class MCPServer:
                         "name_contains": {
                             "type": "string",
                             "description": "Text that entity name should contain (case-insensitive)"
+                        },
+                        "device_class": {
+                            "oneOf": [
+                                {"type": "string"},
+                                {"type": "array", "items": {"type": "string"}}
+                            ],
+                            "description": "Device class to filter by (e.g., 'temperature', 'motion', 'door', 'moisture'). Can be a single string or array of strings for OR logic. Check the index for available device classes per domain."
+                        },
+                        "name_pattern": {
+                            "type": "string",
+                            "description": "Wildcard pattern to match entity IDs (e.g., '*_person_detected', 'sensor.*_ble_area'). Supports * for any characters."
+                        },
+                        "inferred_type": {
+                            "type": "string",
+                            "description": "Inferred entity type from the index (e.g., 'person_detection', 'location_tracking'). The pattern will be looked up from the index's inferred_types. Check get_index() to see available inferred types."
                         },
                         "limit": {
                             "type": "integer",
@@ -650,6 +665,17 @@ class MCPServer:
             {
                 "name": "list_domains",
                 "description": "List all available domains with entity counts",
+                "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_index",
+                "description": "Get the pre-generated system structure index. This index provides a lightweight overview of the Home Assistant system including areas, domains, device classes, people, pets, calendars, zones, automations, and scripts. Call this ONCE at the start of a conversation to understand what exists in the system, then use discover_entities to query specific entities. The index is ~400-800 tokens vs ~15k tokens for a full entity dump.",
                 "inputSchema": {
                     "$schema": "http://json-schema.org/draft-07/schema#",
                     "type": "object",
@@ -756,6 +782,8 @@ class MCPServer:
             return await self.tool_list_areas()
         elif tool_name == "list_domains":
             return await self.tool_list_domains()
+        elif tool_name == "get_index":
+            return await self.tool_get_index()
         elif tool_name == "perform_action":
             return await self.tool_perform_action(arguments)
         elif tool_name == "set_conversation_state":
@@ -778,7 +806,10 @@ class MCPServer:
             domain=args.get("domain"),
             state=args.get("state"),
             name_contains=args.get("name_contains"),
-            limit=args.get("limit", 20)
+            limit=args.get("limit", 20),
+            device_class=args.get("device_class"),
+            name_pattern=args.get("name_pattern"),
+            inferred_type=args.get("inferred_type"),
         )
 
         # Notify completion
@@ -949,6 +980,36 @@ class MCPServer:
                 {
                     "type": "text",
                     "text": result_text
+                }
+            ]
+        }
+
+    async def tool_get_index(self) -> Dict[str, Any]:
+        """Get the pre-generated system structure index."""
+        from .const import DOMAIN
+
+        # Get index manager from hass.data
+        index_manager = self.hass.data.get(DOMAIN, {}).get("index_manager")
+
+        if not index_manager:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Index manager not available. This feature requires MCP Assist 0.5.0 or later."
+                    }
+                ]
+            }
+
+        # Get the index
+        index = await index_manager.get_index()
+
+        # Format as JSON for structured consumption
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps(index, indent=2)
                 }
             ]
         }
