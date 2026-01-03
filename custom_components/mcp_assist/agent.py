@@ -20,6 +20,7 @@ from homeassistant.helpers import intent, area_registry as ar, device_registry a
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    DOMAIN,
     CONF_LMSTUDIO_URL,
     CONF_MODEL_NAME,
     CONF_MCP_PORT,
@@ -351,7 +352,7 @@ class MCPAssistAgent(AbstractConversationAgent):
             return "Unknown"
 
     async def _build_system_prompt_with_context(self, user_input: ConversationInput) -> str:
-        """Build system prompt with home context (areas, domains)."""
+        """Build system prompt with Smart Entity Index."""
         try:
             # Get base prompts (check options first, then data, then defaults)
             system_prompt = self.entry.options.get(CONF_SYSTEM_PROMPT,
@@ -369,11 +370,20 @@ class MCPAssistAgent(AbstractConversationAgent):
             current_area = await self._get_current_area(user_input)
             technical_prompt = technical_prompt.replace('{current_area}', current_area)
 
-            # Fetch home context (areas and domains)
-            context = await self._get_home_context()
+            # Get Smart Entity Index from IndexManager
+            index_manager = self.hass.data.get(DOMAIN, {}).get("index_manager")
+            if index_manager:
+                index = await index_manager.get_index()
+                index_json = json.dumps(index, indent=2)
+            else:
+                index_json = "{}"
+                _LOGGER.warning("IndexManager not available, using empty index")
 
-            # Combine: system prompt + context + technical prompt
-            return f"{system_prompt}\n\n{context}\n\n{technical_prompt}"
+            # Replace {index} placeholder
+            technical_prompt = technical_prompt.replace('{index}', index_json)
+
+            # Combine: system prompt + technical prompt
+            return f"{system_prompt}\n\n{technical_prompt}"
 
         except Exception as e:
             _LOGGER.error("Error building system prompt: %s", e)
@@ -409,7 +419,7 @@ class MCPAssistAgent(AbstractConversationAgent):
             return ""
 
     def _build_system_prompt(self) -> str:
-        """Build system prompt for LM Studio (legacy sync version)."""
+        """Build system prompt (legacy sync version - note: cannot include index without async)."""
         try:
             # Get prompts (check options first, then data, then defaults)
             system_prompt = self.entry.options.get(CONF_SYSTEM_PROMPT,
@@ -424,6 +434,8 @@ class MCPAssistAgent(AbstractConversationAgent):
             # Replace placeholders in technical prompt
             technical_prompt = technical_prompt.replace('{time}', current_time)
             technical_prompt = technical_prompt.replace('{date}', current_date)
+            technical_prompt = technical_prompt.replace('{current_area}', 'Unknown')
+            technical_prompt = technical_prompt.replace('{index}', '{}')
 
             # Combine prompts
             return f"{system_prompt}\n\n{technical_prompt}"
