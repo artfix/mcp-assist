@@ -46,6 +46,7 @@ from .const import (
     CONF_ENABLE_CUSTOM_TOOLS,
     CONF_BRAVE_API_KEY,
     CONF_ALLOWED_IPS,
+    CONF_ENABLE_GAP_FILLING,
     SERVER_TYPE_LMSTUDIO,
     SERVER_TYPE_OLLAMA,
     SERVER_TYPE_OPENAI,
@@ -68,6 +69,7 @@ from .const import (
     DEFAULT_ENABLE_CUSTOM_TOOLS,
     DEFAULT_BRAVE_API_KEY,
     DEFAULT_ALLOWED_IPS,
+    DEFAULT_ENABLE_GAP_FILLING,
     DEFAULT_API_KEY,
     OPENAI_BASE_URL,
     GEMINI_BASE_URL,
@@ -486,6 +488,7 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(CONF_ENABLE_CUSTOM_TOOLS, default=DEFAULT_ENABLE_CUSTOM_TOOLS): bool,
             vol.Optional(CONF_BRAVE_API_KEY, default=DEFAULT_BRAVE_API_KEY): str,
             vol.Optional(CONF_ALLOWED_IPS, default=DEFAULT_ALLOWED_IPS): str,
+            vol.Optional(CONF_ENABLE_GAP_FILLING, default=DEFAULT_ENABLE_GAP_FILLING): bool,
             vol.Required(CONF_MCP_PORT, default=DEFAULT_MCP_PORT): vol.Coerce(int),
             vol.Required(CONF_DEBUG_MODE, default=DEFAULT_DEBUG_MODE): bool,
         })
@@ -703,13 +706,19 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                     default=options.get(CONF_ALLOWED_IPS, data.get(CONF_ALLOWED_IPS, DEFAULT_ALLOWED_IPS))
                 ): str,
 
-                # 15. MCP Server Port
+                # 15. Enable Gap-Filling
+                vol.Optional(
+                    CONF_ENABLE_GAP_FILLING,
+                    default=options.get(CONF_ENABLE_GAP_FILLING, data.get(CONF_ENABLE_GAP_FILLING, DEFAULT_ENABLE_GAP_FILLING))
+                ): bool,
+
+                # 16. MCP Server Port
                 vol.Required(
                     CONF_MCP_PORT,
                     default=options.get(CONF_MCP_PORT, data.get(CONF_MCP_PORT, DEFAULT_MCP_PORT))
                 ): vol.Coerce(int),
 
-                # 16. Debug Mode
+                # 17. Debug Mode
                 vol.Required(
                     CONF_DEBUG_MODE,
                     default=options.get(CONF_DEBUG_MODE, data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE))
