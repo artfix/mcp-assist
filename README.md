@@ -237,7 +237,7 @@ Tool calling (function calling) requires the model to:
 - Handles multi-step queries reliably ("check all rooms for open windows, then turn off lights in those rooms")
 - **Recommended for Home Assistant** where queries often involve discovery + action combinations
 
-**Recommendation**: Use thinking/reasoning models for MCP Assist. The improved reliability with multi-tool queries outweighs the slightly slower response time for most home automation scenarios.
+Choose the model type that best fits your use case. Thinking/reasoning models offer better reliability with complex multi-tool queries, while instruct models provide faster responses for simple commands.
 
 ### Recommended Models
 
