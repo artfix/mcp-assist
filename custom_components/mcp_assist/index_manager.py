@@ -342,20 +342,47 @@ class IndexManager:
         _LOGGER.debug("Found %d automations", len(automations))
         return automations
 
-    async def _get_scripts(self) -> List[str]:
-        """Get all script entities."""
+    async def _get_scripts(self) -> List[Dict[str, Any] | str]:
+        """Get script entities with field definitions."""
         entity_reg = er.async_get(self.hass)
+
+        # Access script component to get field definitions
+        script_component = self.hass.data.get("script")
 
         scripts = []
         for entity in entity_reg.entities.values():
             if entity.entity_id.startswith('script.'):
                 if async_should_expose(self.hass, "conversation", entity.entity_id):
+                    script_id = entity.entity_id.split('.')[1]
                     state_obj = self.hass.states.get(entity.entity_id)
-                    name = state_obj.name if state_obj else entity.entity_id.split('.')[1]
-                    scripts.append(name)
+                    name = state_obj.name if state_obj else script_id
 
-        scripts.sort()
-        _LOGGER.debug("Found %d scripts", len(scripts))
+                    # Get fields from the script entity
+                    fields = None
+                    if script_component:
+                        script_entity = script_component.get_entity(entity.entity_id)
+                        if script_entity and hasattr(script_entity, 'fields') and script_entity.fields:
+                            fields = script_entity.fields
+
+                    if fields:
+                        script_info = {
+                            "id": script_id,
+                            "name": name,
+                            "fields": {}
+                        }
+                        # Extract field descriptions
+                        for field_name, field_data in fields.items():
+                            desc = field_data.get('description', '') if isinstance(field_data, dict) else ''
+                            script_info["fields"][field_name] = {"description": desc} if desc else {}
+
+                        scripts.append(script_info)
+                    else:
+                        scripts.append(name)
+
+        scripts.sort(key=lambda x: x["name"] if isinstance(x, dict) else x)
+        _LOGGER.debug("Found %d scripts (%d with fields)",
+                     len(scripts),
+                     sum(1 for s in scripts if isinstance(s, dict)))
         return scripts
 
     async def _get_input_helpers(self) -> Dict[str, List[str]]:

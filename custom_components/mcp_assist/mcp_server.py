@@ -753,6 +753,58 @@ class MCPServer:
                     "required": ["expecting_response"],
                     "additionalProperties": False
                 }
+            },
+            {
+                "name": "run_script",
+                "description": "Execute a Home Assistant script and return its response variables. Use this for scripts that return data (e.g., camera analysis, calculations). Returns the script's response variables.",
+                "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                        "script_id": {
+                            "type": "string",
+                            "description": "The script entity ID (e.g., 'script.llm_camera_analysis' or just 'llm_camera_analysis')"
+                        },
+                        "variables": {
+                            "type": "object",
+                            "description": "Variables to pass to the script",
+                            "additionalProperties": True
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Timeout in seconds (default: 60)",
+                            "default": 60
+                        }
+                    },
+                    "required": ["script_id"],
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "run_automation",
+                "description": "Trigger a Home Assistant automation with optional variables. Use this to manually trigger automations.",
+                "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                        "automation_id": {
+                            "type": "string",
+                            "description": "The automation entity ID (e.g., 'automation.notify_on_motion' or just 'notify_on_motion')"
+                        },
+                        "variables": {
+                            "type": "object",
+                            "description": "Variables to pass to the automation (available as trigger.variables)",
+                            "additionalProperties": True
+                        },
+                        "skip_conditions": {
+                            "type": "boolean",
+                            "description": "Whether to skip the automation's conditions (default: false)",
+                            "default": False
+                        }
+                    },
+                    "required": ["automation_id"],
+                    "additionalProperties": False
+                }
             }
         ]
 
@@ -788,6 +840,10 @@ class MCPServer:
             return await self.tool_perform_action(arguments)
         elif tool_name == "set_conversation_state":
             return await self.tool_set_conversation_state(arguments)
+        elif tool_name == "run_script":
+            return await self.tool_run_script(arguments)
+        elif tool_name == "run_automation":
+            return await self.tool_run_automation(arguments)
         else:
             # Check if it's a custom tool
             if self.custom_tools and self.custom_tools.is_custom_tool(tool_name):
@@ -1142,6 +1198,151 @@ class MCPServer:
                 "text": f"conversation_state:{expecting_response}"
             }]
         }
+
+    async def tool_run_script(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a Home Assistant script and return its response variables."""
+        script_id = args.get("script_id")
+        variables = args.get("variables", {})
+        timeout = args.get("timeout", 60)
+
+        # Extract script name (remove script. prefix if present)
+        script_name = script_id.replace("script.", "")
+        full_script_id = f"script.{script_name}"
+
+        _LOGGER.info(f"📜 Running script: {full_script_id} with variables: {variables}")
+
+        # Notify start
+        self.publish_progress(
+            "tool_start",
+            f"Running script: {full_script_id}",
+            tool="run_script",
+            script_id=full_script_id
+        )
+
+        try:
+            # Call the script directly as a service (not script.turn_on)
+            # Variables go directly in service_data, not nested
+            response = await asyncio.wait_for(
+                self.hass.services.async_call(
+                    domain="script",
+                    service=script_name,  # Call script directly
+                    service_data=variables,  # Variables go directly here
+                    blocking=True,
+                    return_response=True,
+                ),
+                timeout=timeout
+            )
+
+            # Notify completion
+            self.publish_progress(
+                "tool_complete",
+                f"Script completed: {full_script_id}",
+                tool="run_script",
+                success=True
+            )
+
+            # Format the response
+            result_text = f"✅ Script {full_script_id} completed successfully"
+
+            # If the script returned response variables, include them
+            if response:
+                result_text += f"\n\nResponse:\n{json.dumps(response, indent=2)}"
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": result_text
+                    }],
+                    "response": response
+                }
+            else:
+                result_text += "\n\nNo response variables returned (script may not have response_variable defined)"
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": result_text
+                    }]
+                }
+
+        except asyncio.TimeoutError:
+            error_msg = f"Script execution timed out after {timeout} seconds"
+            _LOGGER.error(f"❌ {error_msg}: {full_script_id}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"❌ Error: {error_msg}"
+                }]
+            }
+        except Exception as err:
+            error_msg = f"Script execution failed: {err}"
+            _LOGGER.exception(f"❌ {error_msg}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"❌ Error: {error_msg}"
+                }]
+            }
+
+    async def tool_run_automation(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Trigger a Home Assistant automation with optional variables."""
+        automation_id = args.get("automation_id")
+        variables = args.get("variables", {})
+        skip_conditions = args.get("skip_conditions", False)
+
+        # Normalize automation_id (add automation. prefix if missing)
+        if not automation_id.startswith("automation."):
+            automation_id = f"automation.{automation_id}"
+
+        _LOGGER.info(f"🤖 Triggering automation: {automation_id} with variables: {variables}, skip_conditions: {skip_conditions}")
+
+        # Notify start
+        self.publish_progress(
+            "tool_start",
+            f"Triggering automation: {automation_id}",
+            tool="run_automation",
+            automation_id=automation_id
+        )
+
+        try:
+            # Trigger the automation
+            await self.hass.services.async_call(
+                domain="automation",
+                service="trigger",
+                service_data={
+                    "entity_id": automation_id,
+                    "variables": variables,
+                    "skip_condition": skip_conditions,
+                },
+                blocking=True,
+            )
+
+            # Notify completion
+            self.publish_progress(
+                "tool_complete",
+                f"Automation triggered: {automation_id}",
+                tool="run_automation",
+                success=True
+            )
+
+            result_text = f"✅ Automation {automation_id} triggered successfully"
+            if skip_conditions:
+                result_text += " (conditions skipped)"
+
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": result_text
+                }]
+            }
+
+        except Exception as err:
+            error_msg = f"Automation trigger failed: {err}"
+            _LOGGER.exception(f"❌ {error_msg}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"❌ Error: {error_msg}"
+                }]
+            }
 
     def validate_service(self, domain: str, action: str) -> str:
         """Validate that a domain/action combination is allowed.

@@ -81,9 +81,23 @@ DEFAULT_TECHNICAL_PROMPT = """You are controlling a Home Assistant smart home sy
 - **perform_action**: control devices using discovered entity IDs
 - **get_entity_details**: check states using discovered entity IDs
 - **list_areas/list_domains**: list available areas and device types
+- **run_script**: execute scripts that return data (e.g., camera analysis, calculations)
+- **run_automation**: trigger automations manually
 - **set_conversation_state**: indicate if expecting user response
 - **brave_search**: search the web for current information
 - **read_url**: read and extract content from web pages
+
+## Scripts (use run_script tool)
+Scripts can perform complex operations and return data. Check the index for available scripts with their parameters.
+
+Example - Camera analysis:
+  run_script(script_id="llm_camera_analysis", variables={{"camera_entities": "camera.living_room", "prompt": "Is anyone there?"}})
+
+## Automations (use run_automation tool)
+Trigger automations manually. Check the index for available automations.
+
+Example:
+  run_automation(automation_id="alert_letterbox")
 
 ## Discovery Strategy
 Use the index below to see what device_classes and domains exist, then query accordingly.
