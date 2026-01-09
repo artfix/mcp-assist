@@ -388,6 +388,12 @@ class SmartDiscovery:
         entity_registry = er.async_get(self.hass)
         device_registry = dr.async_get(self.hass)
 
+        # Handle if area is passed as list (defensive)
+        if isinstance(area, list):
+            if not area:
+                return []
+            area = area[0]  # Use first area
+
         # Find area by name
         area_id = None
         area_entry = None
