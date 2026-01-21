@@ -533,12 +533,15 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data=combined_data,
                 )
 
-        # Get server type to conditionally show Ollama fields
+        # Get server type to conditionally show Ollama fields and set defaults
         server_type = self.step1_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
+
+        # Gemini requires temperature=1.0 for optimal performance (Google's guidance)
+        default_temp = 1.0 if server_type == SERVER_TYPE_GEMINI else DEFAULT_TEMPERATURE
 
         # Build base schema
         advanced_schema_dict = {
-            vol.Required(CONF_TEMPERATURE, default=DEFAULT_TEMPERATURE): vol.All(
+            vol.Required(CONF_TEMPERATURE, default=default_temp): vol.All(
                 vol.Coerce(float), vol.Range(min=0.0, max=1.0)
             ),
             vol.Required(CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS): vol.Coerce(int),

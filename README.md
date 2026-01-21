@@ -197,15 +197,30 @@ The Smart Entity Index provides a lightweight (~400-800 tokens) snapshot of your
 - **Technical Instructions**: Low-level instructions for tool usage (usually leave as default)
 
 ### Advanced Settings
-- **Temperature**: 0.0 (deterministic) to 1.0 (creative)
 - **Max Response Tokens**: Limit response length (default: 500)
 - **Max History Messages**: How many conversation turns to remember (default: 10)
-- **Max Tool Iterations**: Prevent infinite loops (default: 5)
+- **Max Tool Iterations**: Prevent infinite loops (default: 10)
 - **Response Mode**:
   - **Smart** (default): LLM decides if follow-up needed
   - **Always**: Always wait for follow-up
   - **None**: Never wait for follow-up
 - **Enable Smart Entity Index**: Context-aware entity discovery with automatic gap-filling for uncommon devices (default: enabled)
+
+### Temperature Settings
+
+Temperature controls response randomness (0.0 = deterministic, 1.0 = creative). Different providers have different optimal values:
+
+| Provider | Default | Reason |
+|----------|---------|--------|
+| **Gemini** | `1.0` | Google requires 1.0 for Gemini 3 to avoid "looping or degraded performance" |
+| **OpenAI (GPT-4)** | `0.5` | Balanced for reliable tool calling |
+| **OpenAI (GPT-5/o1)** | N/A | Reasoning models don't use temperature |
+| **Anthropic Claude** | `0.5` | Works well across 0.5-1.0 range |
+| **LM Studio / llama.cpp** | `0.5` | Lower temps improve tool calling accuracy |
+| **Ollama** | `0.5` | Model-dependent, lower is safer for tools |
+| **OpenRouter** | `0.5` | Depends on underlying model |
+
+**Note**: You can always override these defaults in Advanced Settings. For Home Assistant voice control, lower temperatures (0.5-0.7) generally provide more consistent tool calling and accurate entity control.
 
 ### MCP Server Settings
 - **MCP Server Port**: Default 8090 (change if port conflict)
