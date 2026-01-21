@@ -88,15 +88,8 @@ class MCPServer:
 
         _LOGGER.info("MCP server allowed IPs/ranges: %s", self.allowed_ips)
 
-        # Initialize custom tools if search provider is enabled
+        # Custom tools will be initialized in start() after system entry exists
         self.custom_tools = None
-        search_provider = self._get_search_provider()
-        if search_provider in ["brave", "duckduckgo"]:
-            try:
-                from .custom_tools import CustomToolsLoader
-                self.custom_tools = CustomToolsLoader(hass, entry)
-            except Exception as e:
-                _LOGGER.error(f"Failed to load custom tools: {e}")
 
     def _get_shared_setting(self, key: str, default: Any) -> Any:
         """Get a shared setting from system entry with fallback to profile entry."""
@@ -152,9 +145,17 @@ class MCPServer:
             self.site = web.TCPSite(self.runner, "0.0.0.0", self.port)
             await self.site.start()
 
-            # Initialize custom tools if enabled
-            if self.custom_tools:
-                await self.custom_tools.initialize()
+            # Create and initialize custom tools if search provider is enabled
+            # Done here (not in __init__) so system entry exists for reading settings
+            search_provider = self._get_search_provider()
+            if search_provider in ["brave", "duckduckgo"]:
+                try:
+                    from .custom_tools import CustomToolsLoader
+                    self.custom_tools = CustomToolsLoader(self.hass, self.entry)
+                    await self.custom_tools.initialize()
+                    _LOGGER.info("✅ Custom tools initialized for search provider: %s", search_provider)
+                except Exception as e:
+                    _LOGGER.error(f"Failed to initialize custom tools: {e}")
 
             _LOGGER.info("✅ MCP server started successfully on http://0.0.0.0:%d", self.port)
             _LOGGER.info("🌐 MCP server is accessible from external machines")
