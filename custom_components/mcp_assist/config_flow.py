@@ -54,6 +54,7 @@ from .const import (
     SERVER_TYPE_OPENAI,
     SERVER_TYPE_GEMINI,
     SERVER_TYPE_ANTHROPIC,
+    SERVER_TYPE_OPENROUTER,
     DEFAULT_SERVER_TYPE,
     DEFAULT_LMSTUDIO_URL,
     DEFAULT_OLLAMA_URL,
@@ -78,6 +79,7 @@ from .const import (
     DEFAULT_API_KEY,
     OPENAI_BASE_URL,
     GEMINI_BASE_URL,
+    OPENROUTER_BASE_URL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -183,6 +185,42 @@ async def fetch_models_from_gemini(hass: HomeAssistant, api_key: str) -> list[st
         return []
 
 
+async def fetch_models_from_openrouter(hass: HomeAssistant, api_key: str) -> list[str]:
+    """Fetch available models from OpenRouter API."""
+    _LOGGER.info("🌐 FETCH: Starting OpenRouter model fetch")
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "HTTP-Referer": "https://github.com/mike-nott/mcp-assist",
+            "X-Title": "MCP Assist for Home Assistant"
+        }
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            _LOGGER.info("📡 FETCH: Requesting OpenRouter models")
+            async with session.get(
+                f"{OPENROUTER_BASE_URL}/v1/models",
+                headers=headers
+            ) as resp:
+                _LOGGER.info("📥 FETCH: OpenRouter response status %d", resp.status)
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    _LOGGER.warning("⚠️ FETCH: OpenRouter API error %d: %s", resp.status, error_text[:200])
+                    return []
+
+                data = await resp.json()
+                # OpenRouter returns models in OpenAI-compatible format
+                all_models = [m.get("id", "") for m in data.get("data", [])]
+                # Filter out empty strings and sort
+                models = [m for m in all_models if m]
+                sorted_models = sorted(models) if models else []
+                _LOGGER.info("✨ FETCH: Found %d OpenRouter models", len(sorted_models))
+                return sorted_models
+    except Exception as err:
+        _LOGGER.error("💥 FETCH: OpenRouter fetch failed: %s", err)
+        return []
+
+
 def validate_allowed_ips(allowed_ips_str: str) -> tuple[bool, str]:
     """Validate comma-separated list of IP addresses and CIDR ranges.
 
@@ -218,6 +256,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema({
                 {"value": "openai", "label": "OpenAI"},
                 {"value": "gemini", "label": "Google Gemini"},
                 {"value": "anthropic", "label": "Anthropic (Claude)"},
+                {"value": "openrouter", "label": "OpenRouter"},
             ],
             mode=SelectSelectorMode.LIST,
         )
@@ -334,7 +373,7 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_LMSTUDIO_URL, default=default_url): str,
             })
         else:
-            # Cloud providers - show API key field
+            # Cloud providers (OpenAI, Gemini, Anthropic, OpenRouter) - show API key field
             server_schema = vol.Schema({
                 vol.Required(CONF_API_KEY): str,
             })
@@ -384,16 +423,26 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Show error if fetch failed
             if not models:
                 errors["base"] = "invalid_api_key"
+        elif server_type == SERVER_TYPE_OPENROUTER:
+            # OpenRouter - fetch models from API with authentication
+            api_key = self.step2_data.get(CONF_API_KEY, "")
+            _LOGGER.debug("Fetching OpenRouter models with API key")
+            models = await fetch_models_from_openrouter(self.hass, api_key)
+            _LOGGER.debug("Fetched %d OpenRouter models: %s", len(models), models)
+            # Show error if fetch failed
+            if not models:
+                errors["base"] = "invalid_api_key"
 
         # Build dynamic schema based on whether models were fetched
         if models:
-            # Show dropdown with available models
+            # Show dropdown with available models (custom_value allows free text input)
             _LOGGER.info("Showing model dropdown with %d models", len(models))
             model_schema = vol.Schema({
                 vol.Required(CONF_MODEL_NAME): SelectSelector(
                     SelectSelectorConfig(
                         options=models,
                         mode=SelectSelectorMode.DROPDOWN,
+                        custom_value=True,
                     )
                 ),
                 vol.Required(CONF_SYSTEM_PROMPT, default=DEFAULT_SYSTEM_PROMPT): TextSelector(
@@ -461,6 +510,7 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     SERVER_TYPE_OPENAI: "OpenAI",
                     SERVER_TYPE_GEMINI: "Gemini",
                     SERVER_TYPE_ANTHROPIC: "Claude",
+                    SERVER_TYPE_OPENROUTER: "OpenRouter",
                 }
                 server_display = server_display_map.get(server_type, "LM Studio")
 
@@ -566,6 +616,7 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                         SERVER_TYPE_OPENAI: "OpenAI",
                         SERVER_TYPE_GEMINI: "Gemini",
                         SERVER_TYPE_ANTHROPIC: "Claude",
+                        SERVER_TYPE_OPENROUTER: "OpenRouter",
                     }
                     server_display = server_display_map.get(server_type, "LM Studio")
                     self.hass.config_entries.async_update_entry(
@@ -620,14 +671,25 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                     _LOGGER.info(f"✅ OPTIONS: Successfully fetched {len(models)} Gemini models")
                 except Exception as err:
                     _LOGGER.error(f"❌ OPTIONS: Failed to fetch Gemini models: {err}")
+        elif server_type == SERVER_TYPE_OPENROUTER:
+            # OpenRouter - fetch from API
+            api_key = options.get(CONF_API_KEY, data.get(CONF_API_KEY, ""))
+            if api_key:
+                _LOGGER.info("🔍 OPTIONS: Attempting to fetch models from OpenRouter")
+                try:
+                    models = await fetch_models_from_openrouter(self.hass, api_key)
+                    _LOGGER.info(f"✅ OPTIONS: Successfully fetched {len(models)} OpenRouter models")
+                except Exception as err:
+                    _LOGGER.error(f"❌ OPTIONS: Failed to fetch OpenRouter models: {err}")
 
         # Build model selector based on whether models were fetched
         if models:
-            # Show dropdown with available models
+            # Show dropdown with available models (custom_value allows free text input)
             model_selector = SelectSelector(
                 SelectSelectorConfig(
                     options=models,
                     mode=SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
                 )
             )
         else:

@@ -8,6 +8,7 @@ SERVER_TYPE_OLLAMA = "ollama"
 SERVER_TYPE_OPENAI = "openai"
 SERVER_TYPE_GEMINI = "gemini"
 SERVER_TYPE_ANTHROPIC = "anthropic"
+SERVER_TYPE_OPENROUTER = "openrouter"
 
 # Configuration keys
 CONF_PROFILE_NAME = "profile_name"
@@ -45,6 +46,7 @@ DEFAULT_API_KEY = ""
 OPENAI_BASE_URL = "https://api.openai.com"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api"
 
 # No hardcoded model lists - models are fetched dynamically from provider APIs
 DEFAULT_MODEL_NAME = "model"
@@ -117,9 +119,11 @@ For ANY device request:
 - Use natural language for states ("on" → "turned on", "home" → "at home")
 
 ## Follow-up Questions
-- After single device actions: "Anything else?"
-- When reporting adjustable status: "Want me to change it?"
-- For partial completions: "Should I handle the others?"
+Generate contextually appropriate follow-up questions naturally:
+- After single device actions: Create a natural follow-up asking if the user needs help with anything else (vary phrasing each time)
+- When reporting adjustable status: Spontaneously suggest adjusting it in a natural way
+- For partial completions: Ask if the user wants you to complete the remaining tasks
+Always vary your phrasing - never repeat the same question twice in a conversation.
 
 ## Ending Conversations
 When user indicates they're done - do not respond further.

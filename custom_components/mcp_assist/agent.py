@@ -58,9 +58,11 @@ from .const import (
     SERVER_TYPE_OPENAI,
     SERVER_TYPE_GEMINI,
     SERVER_TYPE_ANTHROPIC,
+    SERVER_TYPE_OPENROUTER,
     OPENAI_BASE_URL,
     GEMINI_BASE_URL,
     ANTHROPIC_BASE_URL,
+    OPENROUTER_BASE_URL,
 )
 from .conversation_history import ConversationHistory
 
@@ -92,6 +94,7 @@ class MCPAssistConversationEntity(ConversationEntity):
             SERVER_TYPE_OPENAI: "OpenAI",
             SERVER_TYPE_GEMINI: "Gemini",
             SERVER_TYPE_ANTHROPIC: "Claude",
+            SERVER_TYPE_OPENROUTER: "OpenRouter",
         }
         server_display_name = server_display_names.get(self.server_type, self.server_type)
 
@@ -116,6 +119,8 @@ class MCPAssistConversationEntity(ConversationEntity):
             self.base_url = GEMINI_BASE_URL
         elif self.server_type == SERVER_TYPE_ANTHROPIC:
             self.base_url = ANTHROPIC_BASE_URL
+        elif self.server_type == SERVER_TYPE_OPENROUTER:
+            self.base_url = OPENROUTER_BASE_URL
         else:
             # LM Studio or Ollama - URL can change, so make it a property below
             pass
@@ -141,7 +146,7 @@ class MCPAssistConversationEntity(ConversationEntity):
     @property
     def base_url_dynamic(self) -> str:
         """Get base URL (dynamic for local servers)."""
-        if self.server_type in [SERVER_TYPE_OPENAI, SERVER_TYPE_GEMINI, SERVER_TYPE_ANTHROPIC]:
+        if self.server_type in [SERVER_TYPE_OPENAI, SERVER_TYPE_GEMINI, SERVER_TYPE_ANTHROPIC, SERVER_TYPE_OPENROUTER]:
             return self.base_url  # Static
         else:
             # LM Studio/Ollama - read dynamically
@@ -224,6 +229,7 @@ class MCPAssistConversationEntity(ConversationEntity):
             SERVER_TYPE_OPENAI: "OpenAI",
             SERVER_TYPE_GEMINI: "Gemini",
             SERVER_TYPE_ANTHROPIC: "Claude",
+            SERVER_TYPE_OPENROUTER: "OpenRouter",
         }.get(self.server_type, "LLM")
         return f"Powered by {server_name} with MCP entity discovery"
 
@@ -857,6 +863,13 @@ class MCPAssistConversationEntity(ConversationEntity):
         elif self.server_type == SERVER_TYPE_ANTHROPIC:
             # Anthropic OpenAI-compatible endpoint uses Bearer token
             return {"Authorization": f"Bearer {self.api_key}"}
+        elif self.server_type == SERVER_TYPE_OPENROUTER:
+            # OpenRouter uses Bearer token with optional HTTP-Referer header
+            return {
+                "Authorization": f"Bearer {self.api_key}",
+                "HTTP-Referer": "https://github.com/mike-nott/mcp-assist",
+                "X-Title": "MCP Assist for Home Assistant"
+            }
         else:
             # Local servers (LM Studio, Ollama) don't need auth
             return {}
