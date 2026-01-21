@@ -510,6 +510,7 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     SERVER_TYPE_OPENAI: "OpenAI",
                     SERVER_TYPE_GEMINI: "Gemini",
                     SERVER_TYPE_ANTHROPIC: "Claude",
+                    SERVER_TYPE_OPENROUTER: "OpenRouter",
                 }
                 server_display = server_display_map.get(server_type, "LM Studio")
 
