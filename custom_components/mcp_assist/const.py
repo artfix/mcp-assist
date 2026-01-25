@@ -135,10 +135,14 @@ DEFAULT_TECHNICAL_PROMPT = """You are controlling a Home Assistant smart home sy
 - **read_url**: read and extract content from web pages
 
 ## Scripts (use run_script tool)
-Scripts can perform complex operations and return data. Check the index for available scripts with their parameters.
+Scripts can perform complex operations and return data. **CRITICAL:** Always discover scripts first to get the correct entity ID.
+- Script IDs use underscores (e.g., "script.stovsug_kjokken"), NOT spaces
+- Script IDs must include the "script." domain prefix
+- If script name has spaces in UI, the entity ID will use underscores instead
 
-Example - Camera analysis:
-  run_script(script_id="llm_camera_analysis", variables={{"camera_entities": "camera.living_room", "prompt": "Is anyone there?"}})
+Example workflow:
+  1. discover_entities(domain="script", name_contains="camera")
+  2. run_script(script_id="script.llm_camera_analysis", variables={{"camera_entities": "camera.living_room", "prompt": "Is anyone there?"}})
 
 ## Automations (use run_automation tool)
 Trigger automations manually. Check the index for available automations.

@@ -1549,7 +1549,8 @@ class MCPAssistConversationEntity(ConversationEntity):
                             }
                         }
                     _LOGGER.info(f"🧠 Added thought_signature to {len(current_tool_calls)} tool calls")
-                else:
+                elif self.server_type == SERVER_TYPE_GEMINI:
+                    # Only warn for Gemini - other providers don't use thought_signature
                     _LOGGER.warning("⚠️ No thought_signature captured for Gemini 3 (this will cause 400 error on next turn)")
 
                 assistant_msg = {
