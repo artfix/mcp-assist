@@ -36,6 +36,7 @@ LANGUAGE_METADATA = {
     "tr": {"english": "Turkish", "native": "Türkçe"},
     "fil": {"english": "Filipino", "native": "Filipino"},
     "ar": {"english": "Arabic", "native": "العربية"},
+    "hi": {"english": "Hindi", "native": "हिन्दी"},
 }
 
 # Follow-up phrases that indicate user wants to continue conversation
@@ -66,6 +67,7 @@ FOLLOW_UP_PHRASES = {
     "tr": "başka bir şey, başka ne, yapar mısın, yapmalı mıyım, yapabilir miyim, hangi, nasıl yapabilirim, peki ya, var mı",
     "fil": "iba pa, ano pa, gagawin mo ba, dapat ba ako, maaari ba ako, alin, paano ako, paano naman, mayroon ba",
     "ar": "شيء آخر, ماذا أيضا, هل ستفعل, هل يجب أن, هل يمكنني, أي, كيف يمكنني, ماذا عن, هل يوجد",
+    "hi": "कुछ और, और क्या, क्या आप, क्या मुझे करना चाहिए, क्या मैं कर सकता, कौन सा, मैं कैसे, क्या हो अगर, क्या है",
 }
 
 # End words that indicate user wants to stop conversation
@@ -96,6 +98,7 @@ END_WORDS = {
     "tr": "dur, durdur, iptal, hayır, teşekkürler, güle güle, hoşça kal, tamam, bitti, önemli değil, boşver, unut, hepsi bu",
     "fil": "tigil, hinto, kanselahin, hindi, salamat, paalam, bye, tapos na, okay lang, kalimutan mo, yun lang, ayos na",
     "ar": "توقف, قف, إلغاء, لا, شكرا, مع السلامة, وداعا, انتهيت, لا بأس, انسى, هذا كل شيء, انتهى",
+    "hi": "रुको, बंद करो, रद्द करो, नहीं, धन्यवाद, शुक्रिया, अलविदा, नमस्ते, हो गया, कोई बात नहीं, भूल जाओ, बस इतना ही",
 }
 
 
