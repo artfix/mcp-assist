@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Modele et instructions",
-        "description": "Selectionnez un modele et personnalisez les instructions systeme. Les modeles sont charges automatiquement depuis votre serveur.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Nom du modele",
           "system_prompt": "Instructions systeme",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Parametres avances",
-        "description": "Configurez la temperature, les limites de tokens et d'autres options avancees.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Temperature",
           "max_tokens": "Tokens de reponse maximum",
@@ -39,6 +39,7 @@
           "response_mode": "Mode de reponse",
           "follow_up_phrases": "Phrases de suivi",
           "end_words": "Mots de fin de conversation",
+          "timeout": "Delai de reponse",
           "debug_mode": "Mode debogage",
           "ollama_keep_alive": "Maintenir Ollama actif",
           "ollama_num_ctx": "Fenetre de contexte Ollama",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Parametres du profil",
-        "description": "Configurez ce profil de conversation. Ces parametres n'affectent que ce profil.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Nom du profil",
           "lmstudio_url": "URL du serveur",
@@ -93,6 +94,7 @@
           "response_mode": "Mode de reponse",
           "follow_up_phrases": "Phrases de suivi",
           "end_words": "Mots de fin de conversation",
+          "timeout": "Delai de reponse",
           "debug_mode": "Mode debogage",
           "ollama_keep_alive": "Maintenir Ollama actif",
           "ollama_num_ctx": "Fenetre de contexte Ollama",

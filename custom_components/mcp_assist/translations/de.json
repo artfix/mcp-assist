@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Modell & Prompts",
-        "description": "Waehlen Sie ein Modell und passen Sie den System-Prompt an. Modelle werden automatisch von Ihrem Server geladen.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Modellname",
           "system_prompt": "System-Prompt",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Erweiterte Einstellungen",
-        "description": "Konfigurieren Sie Temperatur, Token-Limits und andere erweiterte Optionen.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Temperatur",
           "max_tokens": "Maximale Antwort-Tokens",
@@ -40,6 +40,7 @@
           "follow_up_phrases": "Nachfrage-Phrasen",
           "end_words": "Gespraech-beenden-Woerter",
           "clean_responses": "Antworten für Sprachausgabe bereinigen",
+          "timeout": "Antwort-Timeout",
           "debug_mode": "Debug-Modus",
           "ollama_keep_alive": "Ollama am Leben halten",
           "ollama_num_ctx": "Ollama Kontextfenster"
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Profil-Einstellungen",
-        "description": "Konfigurieren Sie dieses Konversationsprofil. Diese Einstellungen betreffen nur dieses Profil.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Profilname",
           "lmstudio_url": "Server-URL",
@@ -94,6 +95,7 @@
           "follow_up_phrases": "Nachfrage-Phrasen",
           "end_words": "Gespraech-beenden-Woerter",
           "clean_responses": "Antworten für Sprachausgabe bereinigen",
+          "timeout": "Antwort-Timeout",
           "debug_mode": "Debug-Modus",
           "ollama_keep_alive": "Ollama am Leben halten",
           "ollama_num_ctx": "Ollama Kontextfenster"

@@ -56,6 +56,7 @@ from .const import (
     CONF_FOLLOW_UP_PHRASES,
     CONF_END_WORDS,
     CONF_CLEAN_RESPONSES,
+    CONF_TIMEOUT,
     SERVER_TYPE_LMSTUDIO,
     SERVER_TYPE_LLAMACPP,
     SERVER_TYPE_OLLAMA,
@@ -63,10 +64,12 @@ from .const import (
     SERVER_TYPE_GEMINI,
     SERVER_TYPE_ANTHROPIC,
     SERVER_TYPE_OPENROUTER,
+    SERVER_TYPE_CLAWDBOT,
     DEFAULT_SERVER_TYPE,
     DEFAULT_LMSTUDIO_URL,
     DEFAULT_LLAMACPP_URL,
     DEFAULT_OLLAMA_URL,
+    DEFAULT_CLAWDBOT_URL,
     DEFAULT_MCP_PORT,
     DEFAULT_MODEL_NAME,
     DEFAULT_SYSTEM_PROMPT,
@@ -89,6 +92,7 @@ from .const import (
     DEFAULT_FOLLOW_UP_PHRASES,
     DEFAULT_END_WORDS,
     DEFAULT_CLEAN_RESPONSES,
+    DEFAULT_TIMEOUT,
     DEFAULT_API_KEY,
     OPENAI_BASE_URL,
     GEMINI_BASE_URL,
@@ -271,6 +275,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema({
                 {"value": "gemini", "label": "Google Gemini"},
                 {"value": "anthropic", "label": "Anthropic (Claude)"},
                 {"value": "openrouter", "label": "OpenRouter"},
+                {"value": "clawdbot", "label": "Clawdbot"},
             ],
             mode=SelectSelectorMode.LIST,
         )
@@ -381,17 +386,30 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         server_type = self.step1_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
 
         # Build schema based on server type
-        if server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA]:
+        if server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA, SERVER_TYPE_CLAWDBOT]:
             # Local servers - show URL field
             if server_type == SERVER_TYPE_OLLAMA:
                 default_url = DEFAULT_OLLAMA_URL
             elif server_type == SERVER_TYPE_LLAMACPP:
                 default_url = DEFAULT_LLAMACPP_URL
+            elif server_type == SERVER_TYPE_CLAWDBOT:
+                default_url = DEFAULT_CLAWDBOT_URL
             else:
                 default_url = DEFAULT_LMSTUDIO_URL
-            server_schema = vol.Schema({
-                vol.Required(CONF_LMSTUDIO_URL, default=default_url): str,
-            })
+
+            # Clawdbot needs both URL and API key (bearer token)
+            if server_type == SERVER_TYPE_CLAWDBOT:
+                server_schema = vol.Schema({
+                    vol.Required(CONF_LMSTUDIO_URL, default=default_url): str,
+                    vol.Required(CONF_API_KEY): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    ),
+                })
+            else:
+                # Other local servers - just URL
+                server_schema = vol.Schema({
+                    vol.Required(CONF_LMSTUDIO_URL, default=default_url): str,
+                })
         else:
             # Cloud providers (OpenAI, Gemini, Anthropic, OpenRouter) - show API key field
             server_schema = vol.Schema({
@@ -421,12 +439,37 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         server_type = self.step1_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
         models = []
 
-        if server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA]:
+        # Clawdbot doesn't have /v1/models endpoint - skip model selection
+        if server_type == SERVER_TYPE_CLAWDBOT:
+            # Hardcode model to "main" and use empty system prompt (Clawdbot has its own)
+            model_schema = vol.Schema({
+                vol.Required(CONF_TECHNICAL_PROMPT, default=DEFAULT_TECHNICAL_PROMPT): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
+                ),
+            })
+            # Store hardcoded values
+            self.step3_data = {
+                CONF_MODEL_NAME: "main",
+                CONF_SYSTEM_PROMPT: ""  # Clawdbot manages its own system prompt
+            }
+
+            return self.async_show_form(
+                step_id="model",
+                data_schema=model_schema,
+                errors=errors,
+                description_placeholders={
+                    "server_info": "Clawdbot's model and system prompt are configured on the Clawdbot server. Use the technical instructions below to configure how it uses MCP tools to control Home Assistant."
+                }
+            )
+        elif server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA]:
             # Local servers - fetch models from API
             server_url = self.step2_data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL).rstrip("/")
             _LOGGER.debug("Attempting to fetch models from %s", server_url)
             models = await fetch_models_from_lmstudio(self.hass, server_url)
             _LOGGER.debug("Fetched %d models: %s", len(models), models)
+            # Show error if fetch failed
+            if not models:
+                errors["base"] = "cannot_connect"
         elif server_type == SERVER_TYPE_OPENAI:
             # OpenAI - fetch models from API with authentication
             api_key = self.step2_data.get(CONF_API_KEY, "")
@@ -497,6 +540,9 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="model",
             data_schema=model_schema,
             errors=errors,
+            description_placeholders={
+                "server_info": "Select a model and customize the system prompt. Models are automatically loaded from your server."
+            }
         )
 
     async def async_step_advanced(
@@ -505,7 +551,23 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle step 4 - advanced settings."""
         errors: dict[str, str] = {}
 
+        # Get server type to determine which fields to show
+        server_type = self.step1_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
+
         if user_input is not None:
+            # For Clawdbot, set defaults for hidden fields
+            if server_type == SERVER_TYPE_CLAWDBOT:
+                user_input[CONF_TEMPERATURE] = DEFAULT_TEMPERATURE
+                user_input[CONF_MAX_TOKENS] = DEFAULT_MAX_TOKENS
+                user_input[CONF_MAX_HISTORY] = DEFAULT_MAX_HISTORY
+                user_input[CONF_MAX_ITERATIONS] = DEFAULT_MAX_ITERATIONS
+                user_input[CONF_RESPONSE_MODE] = "none"  # Clawdbot manages this
+                user_input[CONF_FOLLOW_UP_PHRASES] = DEFAULT_FOLLOW_UP_PHRASES
+                user_input[CONF_END_WORDS] = DEFAULT_END_WORDS
+                # Timeout is shown for Clawdbot, so use provided value or default to 60
+                if CONF_TIMEOUT not in user_input:
+                    user_input[CONF_TIMEOUT] = 60
+
             # Validate MCP port
             mcp_port = user_input.get(CONF_MCP_PORT, DEFAULT_MCP_PORT)
             if not 1024 <= mcp_port <= 65535:
@@ -570,6 +632,7 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         SERVER_TYPE_GEMINI: "Gemini",
                         SERVER_TYPE_ANTHROPIC: "Claude",
                         SERVER_TYPE_OPENROUTER: "OpenRouter",
+                        SERVER_TYPE_CLAWDBOT: "Clawdbot",
                     }
                     server_display = server_display_map.get(server_type, "LM Studio")
 
@@ -582,62 +645,85 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         data=combined_data,
                     )
 
-        # Get server type to conditionally show Ollama fields and set defaults
-        server_type = self.step1_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
-
         # Gemini requires temperature=1.0 for optimal performance (Google's guidance)
         default_temp = 1.0 if server_type == SERVER_TYPE_GEMINI else DEFAULT_TEMPERATURE
 
-        # Build base schema with correct field order
-        advanced_schema_dict = {
-            vol.Required(CONF_TEMPERATURE, default=default_temp): vol.All(
-                vol.Coerce(float), vol.Range(min=0.0, max=1.0)
-            ),
-            vol.Required(CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS): vol.Coerce(int),
-        }
+        # Build schema based on server type
+        if server_type == SERVER_TYPE_CLAWDBOT:
+            # Clawdbot - only show Control HA, Timeout, Clean Responses, Debug
+            advanced_schema_dict = {
+                vol.Required(CONF_CONTROL_HA, default=DEFAULT_CONTROL_HA): bool,
+                vol.Optional(CONF_CLEAN_RESPONSES, default=DEFAULT_CLEAN_RESPONSES): bool,
+                vol.Required(CONF_TIMEOUT, default=60): vol.All(
+                    vol.Coerce(int), vol.Range(min=5, max=300)
+                ),
+                vol.Required(CONF_DEBUG_MODE, default=DEFAULT_DEBUG_MODE): bool,
+            }
+        else:
+            # Other servers - show all fields
+            advanced_schema_dict = {
+                vol.Required(CONF_TEMPERATURE, default=default_temp): vol.All(
+                    vol.Coerce(float), vol.Range(min=0.0, max=1.0)
+                ),
+                vol.Required(CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS): vol.Coerce(int),
+            }
 
-        # Add Ollama-specific fields in correct position (after Max Tokens)
-        if server_type == SERVER_TYPE_OLLAMA:
-            advanced_schema_dict[vol.Optional(CONF_OLLAMA_NUM_CTX, default=DEFAULT_OLLAMA_NUM_CTX)] = vol.Coerce(int)
-            advanced_schema_dict[vol.Optional(CONF_OLLAMA_KEEP_ALIVE, default=DEFAULT_OLLAMA_KEEP_ALIVE)] = str
+            # Add Ollama-specific fields in correct position (after Max Tokens)
+            if server_type == SERVER_TYPE_OLLAMA:
+                advanced_schema_dict[vol.Optional(CONF_OLLAMA_NUM_CTX, default=DEFAULT_OLLAMA_NUM_CTX)] = vol.Coerce(int)
+                advanced_schema_dict[vol.Optional(CONF_OLLAMA_KEEP_ALIVE, default=DEFAULT_OLLAMA_KEEP_ALIVE)] = str
 
-        # Continue with remaining fields
-        advanced_schema_dict.update({
-            vol.Required(CONF_MAX_HISTORY, default=DEFAULT_MAX_HISTORY): vol.Coerce(int),
-            vol.Required(CONF_CONTROL_HA, default=DEFAULT_CONTROL_HA): bool,
-            vol.Required(CONF_MAX_ITERATIONS, default=DEFAULT_MAX_ITERATIONS): vol.Coerce(int),
-            vol.Required(CONF_RESPONSE_MODE, default=DEFAULT_RESPONSE_MODE): SelectSelector(
-                SelectSelectorConfig(
-                    options=[
-                        {"value": "none", "label": "None"},
-                        {"value": "default", "label": "Smart"},
-                        {"value": "always", "label": "Always"},
-                    ],
-                    mode=SelectSelectorMode.DROPDOWN,
-                )
-            ),
-            vol.Optional(
-                CONF_FOLLOW_UP_PHRASES,
-                default=get_follow_up_phrases(self.hass.config.language)
-            ): TextSelector(
-                TextSelectorConfig(multiline=True)
-            ),
-            vol.Optional(
-                CONF_END_WORDS,
-                default=get_end_words(self.hass.config.language)
-            ): TextSelector(
-                TextSelectorConfig(multiline=True)
-            ),
-            vol.Optional(CONF_CLEAN_RESPONSES, default=DEFAULT_CLEAN_RESPONSES): bool,
-            vol.Required(CONF_DEBUG_MODE, default=DEFAULT_DEBUG_MODE): bool,
-        })
+            # Continue with remaining fields
+            advanced_schema_dict.update({
+                vol.Required(CONF_MAX_HISTORY, default=DEFAULT_MAX_HISTORY): vol.Coerce(int),
+                vol.Required(CONF_CONTROL_HA, default=DEFAULT_CONTROL_HA): bool,
+                vol.Required(CONF_MAX_ITERATIONS, default=DEFAULT_MAX_ITERATIONS): vol.Coerce(int),
+                vol.Required(CONF_RESPONSE_MODE, default=DEFAULT_RESPONSE_MODE): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            {"value": "none", "label": "None"},
+                            {"value": "default", "label": "Smart"},
+                            {"value": "always", "label": "Always"},
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(
+                    CONF_FOLLOW_UP_PHRASES,
+                    default=get_follow_up_phrases(self.hass.config.language)
+                ): TextSelector(
+                    TextSelectorConfig(multiline=True)
+                ),
+                vol.Optional(
+                    CONF_END_WORDS,
+                    default=get_end_words(self.hass.config.language)
+                ): TextSelector(
+                    TextSelectorConfig(multiline=True)
+                ),
+                vol.Optional(CONF_CLEAN_RESPONSES, default=DEFAULT_CLEAN_RESPONSES): bool,
+                vol.Required(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.All(
+                    vol.Coerce(int), vol.Range(min=5, max=300)
+                ),
+                vol.Required(CONF_DEBUG_MODE, default=DEFAULT_DEBUG_MODE): bool,
+            })
 
         advanced_schema = vol.Schema(advanced_schema_dict)
+
+        # Set description based on server type
+        if server_type == SERVER_TYPE_CLAWDBOT:
+            description_placeholders = {
+                "advanced_info": "Clawdbot manages temperature, token limits, history, and tool iterations internally. Only essential settings are shown."
+            }
+        else:
+            description_placeholders = {
+                "advanced_info": "Configure temperature, token limits, and other advanced options."
+            }
 
         return self.async_show_form(
             step_id="advanced",
             data_schema=advanced_schema,
             errors=errors,
+            description_placeholders=description_placeholders,
         )
 
     async def async_step_mcp_server(self, user_input=None) -> FlowResult:
@@ -698,6 +784,7 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     SERVER_TYPE_GEMINI: "Gemini",
                     SERVER_TYPE_ANTHROPIC: "Claude",
                     SERVER_TYPE_OPENROUTER: "OpenRouter",
+                    SERVER_TYPE_CLAWDBOT: "Clawdbot",
                 }
                 server_display = server_display_map.get(server_type, "LM Studio")
 
@@ -794,6 +881,14 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                     user_input[CONF_RESPONSE_MODE] = user_input[CONF_FOLLOW_UP_MODE]
                     del user_input[CONF_FOLLOW_UP_MODE]
 
+                # For Clawdbot, ensure model name and empty system prompt are set
+                server_type = self.config_entry.data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
+                if server_type == SERVER_TYPE_CLAWDBOT:
+                    if CONF_MODEL_NAME not in user_input:
+                        user_input[CONF_MODEL_NAME] = "main"
+                    if CONF_SYSTEM_PROMPT not in user_input:
+                        user_input[CONF_SYSTEM_PROMPT] = ""  # Clawdbot manages its own
+
                 # Store profile settings and proceed to MCP server settings
                 self.profile_options = user_input
                 return await self.async_step_mcp_server()
@@ -814,7 +909,11 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
         models = []
         current_model = options.get(CONF_MODEL_NAME, data.get(CONF_MODEL_NAME, DEFAULT_MODEL_NAME))
 
-        if server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA]:
+        # Clawdbot doesn't have /v1/models - skip model fetching
+        if server_type == SERVER_TYPE_CLAWDBOT:
+            # Don't fetch models, don't show model field
+            pass
+        elif server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA]:
             # Local servers - fetch from URL
             server_url = options.get(CONF_LMSTUDIO_URL, data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL)).rstrip("/")
             _LOGGER.info(f"🔍 OPTIONS: Attempting to fetch models from {server_type} at {server_url}")
@@ -878,9 +977,16 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
         }
 
         # 2. Server URL or API Key (based on server type)
-        if server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_OLLAMA]:
+        if server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_OLLAMA, SERVER_TYPE_CLAWDBOT]:
             server_url = options.get(CONF_LMSTUDIO_URL, data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL))
             schema_dict[vol.Required(CONF_LMSTUDIO_URL, default=server_url)] = str
+
+            # Clawdbot also needs bearer token
+            if server_type == SERVER_TYPE_CLAWDBOT:
+                api_key = options.get(CONF_API_KEY, data.get(CONF_API_KEY, ""))
+                schema_dict[vol.Required(CONF_API_KEY, default=api_key)] = TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                )
         else:
             # Cloud providers use API key
             api_key = options.get(CONF_API_KEY, data.get(CONF_API_KEY, ""))
@@ -888,24 +994,47 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                 TextSelectorConfig(type=TextSelectorType.PASSWORD)
             )
 
-        # 3. Model Name (dynamic: dropdown if models found, text input if not)
-        schema_dict[vol.Required(CONF_MODEL_NAME, default=current_model)] = model_selector
+        # 3. Model Name (skip for Clawdbot - hardcoded to "main")
+        if server_type != SERVER_TYPE_CLAWDBOT:
+            schema_dict[vol.Required(CONF_MODEL_NAME, default=current_model)] = model_selector
 
         # Continue with remaining common fields
-        schema_dict.update({
+        # 4. System Prompt (skip for Clawdbot - it manages its own)
+        if server_type != SERVER_TYPE_CLAWDBOT:
+            schema_dict[vol.Required(
+                CONF_SYSTEM_PROMPT,
+                default=options.get(CONF_SYSTEM_PROMPT, data.get(CONF_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT))
+            )] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True))
 
-                # 4. System Prompt
+        # 5. Technical Instructions
+        schema_dict[vol.Required(
+            CONF_TECHNICAL_PROMPT,
+            default=options.get(CONF_TECHNICAL_PROMPT, data.get(CONF_TECHNICAL_PROMPT, DEFAULT_TECHNICAL_PROMPT))
+        )] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True))
+
+        # For Clawdbot, only show Control HA, Timeout, Clean Responses, and Debug Mode
+        if server_type == SERVER_TYPE_CLAWDBOT:
+            schema_dict.update({
                 vol.Required(
-                    CONF_SYSTEM_PROMPT,
-                    default=options.get(CONF_SYSTEM_PROMPT, data.get(CONF_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT))
-                ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)),
-
-                # 5. Technical Instructions
+                    CONF_CONTROL_HA,
+                    default=options.get(CONF_CONTROL_HA, data.get(CONF_CONTROL_HA, DEFAULT_CONTROL_HA))
+                ): bool,
+                vol.Optional(
+                    CONF_CLEAN_RESPONSES,
+                    default=options.get(CONF_CLEAN_RESPONSES, data.get(CONF_CLEAN_RESPONSES, DEFAULT_CLEAN_RESPONSES))
+                ): bool,
                 vol.Required(
-                    CONF_TECHNICAL_PROMPT,
-                    default=options.get(CONF_TECHNICAL_PROMPT, data.get(CONF_TECHNICAL_PROMPT, DEFAULT_TECHNICAL_PROMPT))
-                ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)),
-
+                    CONF_TIMEOUT,
+                    default=options.get(CONF_TIMEOUT, data.get(CONF_TIMEOUT, 60))
+                ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
+                vol.Required(
+                    CONF_DEBUG_MODE,
+                    default=options.get(CONF_DEBUG_MODE, data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE))
+                ): bool,
+            })
+        else:
+            # Other servers - show all fields
+            schema_dict.update({
                 # 6. Temperature
                 vol.Required(
                     CONF_TEMPERATURE,
@@ -917,27 +1046,27 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                     CONF_MAX_TOKENS,
                     default=options.get(CONF_MAX_TOKENS, data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS))
                 ): vol.Coerce(int),
-        })
+            })
 
-        # Add Ollama-specific fields in correct position (after Max Tokens)
-        if server_type == SERVER_TYPE_OLLAMA:
-            schema_dict[vol.Optional(
-                CONF_OLLAMA_NUM_CTX,
-                default=options.get(
+            # Add Ollama-specific fields in correct position (after Max Tokens)
+            if server_type == SERVER_TYPE_OLLAMA:
+                schema_dict[vol.Optional(
                     CONF_OLLAMA_NUM_CTX,
-                    data.get(CONF_OLLAMA_NUM_CTX, DEFAULT_OLLAMA_NUM_CTX)
-                )
-            )] = vol.Coerce(int)
-            schema_dict[vol.Optional(
-                CONF_OLLAMA_KEEP_ALIVE,
-                default=options.get(
+                    default=options.get(
+                        CONF_OLLAMA_NUM_CTX,
+                        data.get(CONF_OLLAMA_NUM_CTX, DEFAULT_OLLAMA_NUM_CTX)
+                    )
+                )] = vol.Coerce(int)
+                schema_dict[vol.Optional(
                     CONF_OLLAMA_KEEP_ALIVE,
-                    data.get(CONF_OLLAMA_KEEP_ALIVE, DEFAULT_OLLAMA_KEEP_ALIVE)
-                )
-            )] = str
+                    default=options.get(
+                        CONF_OLLAMA_KEEP_ALIVE,
+                        data.get(CONF_OLLAMA_KEEP_ALIVE, DEFAULT_OLLAMA_KEEP_ALIVE)
+                    )
+                )] = str
 
-        # Continue with remaining fields
-        schema_dict.update({
+            # Continue with remaining fields
+            schema_dict.update({
                 # 8/10. Max History Messages
                 vol.Required(
                     CONF_MAX_HISTORY,
@@ -989,20 +1118,37 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                     default=options.get(CONF_CLEAN_RESPONSES, data.get(CONF_CLEAN_RESPONSES, DEFAULT_CLEAN_RESPONSES))
                 ): bool,
 
-                # 15/17. Debug Mode
+                # 15/17. Response Time Out
+                vol.Required(
+                    CONF_TIMEOUT,
+                    default=options.get(CONF_TIMEOUT, data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+                ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
+
+                # 16/18. Debug Mode
                 vol.Required(
                     CONF_DEBUG_MODE,
                     default=options.get(CONF_DEBUG_MODE, data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE))
                 ): bool,
-        })
+            })
 
         # Create the schema from the built dictionary
         options_schema = vol.Schema(schema_dict)
+
+        # Set description based on server type
+        if server_type == SERVER_TYPE_CLAWDBOT:
+            description_placeholders = {
+                "server_info": "Clawdbot's model and system prompt are configured on the Clawdbot server. Use the technical instructions below to configure how it uses MCP tools to control Home Assistant."
+            }
+        else:
+            description_placeholders = {
+                "server_info": "Configure this conversation profile. These settings only affect this profile."
+            }
 
         return self.async_show_form(
             step_id="init",
             data_schema=options_schema,
             errors=errors,
+            description_placeholders=description_placeholders,
         )
 
     async def async_step_mcp_server(self, user_input=None):
@@ -1047,6 +1193,7 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                         SERVER_TYPE_GEMINI: "Gemini",
                         SERVER_TYPE_ANTHROPIC: "Claude",
                         SERVER_TYPE_OPENROUTER: "OpenRouter",
+                        SERVER_TYPE_CLAWDBOT: "Clawdbot",
                     }
                     server_display = server_display_map.get(server_type, "LM Studio")
                     self.hass.config_entries.async_update_entry(

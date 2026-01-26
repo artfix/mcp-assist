@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "النموذج والتعليمات",
-        "description": "اختر نموذجا وخصص تعليمات النظام. يتم تحميل النماذج تلقائيا من خادمك.",
+        "description": "{server_info}",
         "data": {
           "model_name": "اسم النموذج",
           "system_prompt": "تعليمات النظام",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "الاعدادات المتقدمة",
-        "description": "قم بتكوين درجة الحرارة وحدود الرموز والخيارات المتقدمة الاخرى.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "درجة الحرارة",
           "max_tokens": "الحد الاقصى لرموز الاستجابة",
@@ -39,6 +39,7 @@
           "response_mode": "وضع الاستجابة",
           "follow_up_phrases": "عبارات المتابعة",
           "end_words": "كلمات انهاء المحادثة",
+          "timeout": "انتهاء مهلة الاستجابة",
           "debug_mode": "وضع التصحيح",
           "ollama_keep_alive": "ابق Ollama نشطا",
           "ollama_num_ctx": "نافذة سياق Ollama",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "اعدادات الملف الشخصي",
-        "description": "قم بتكوين ملف المحادثة هذا. تؤثر هذه الاعدادات على هذا الملف الشخصي فقط.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "اسم الملف الشخصي",
           "lmstudio_url": "عنوان URL للخادم",
@@ -93,6 +94,7 @@
           "response_mode": "وضع الاستجابة",
           "follow_up_phrases": "عبارات المتابعة",
           "end_words": "كلمات انهاء المحادثة",
+          "timeout": "انتهاء مهلة الاستجابة",
           "debug_mode": "وضع التصحيح",
           "ollama_keep_alive": "ابق Ollama نشطا",
           "ollama_num_ctx": "نافذة سياق Ollama",

@@ -51,6 +51,7 @@ from .const import (
     CONF_FOLLOW_UP_PHRASES,
     CONF_END_WORDS,
     CONF_CLEAN_RESPONSES,
+    CONF_TIMEOUT,
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_TECHNICAL_PROMPT,
     DEFAULT_DEBUG_MODE,
@@ -72,6 +73,7 @@ from .const import (
     DEFAULT_FOLLOW_UP_PHRASES,
     DEFAULT_END_WORDS,
     DEFAULT_CLEAN_RESPONSES,
+    DEFAULT_TIMEOUT,
     RESPONSE_MODE_INSTRUCTIONS,
     SERVER_TYPE_LMSTUDIO,
     SERVER_TYPE_LLAMACPP,
@@ -80,6 +82,7 @@ from .const import (
     SERVER_TYPE_GEMINI,
     SERVER_TYPE_ANTHROPIC,
     SERVER_TYPE_OPENROUTER,
+    SERVER_TYPE_CLAWDBOT,
     OPENAI_BASE_URL,
     GEMINI_BASE_URL,
     ANTHROPIC_BASE_URL,
@@ -118,6 +121,7 @@ class MCPAssistConversationEntity(ConversationEntity):
             SERVER_TYPE_GEMINI: "Gemini",
             SERVER_TYPE_ANTHROPIC: "Claude",
             SERVER_TYPE_OPENROUTER: "OpenRouter",
+            SERVER_TYPE_CLAWDBOT: "Clawdbot",
         }
         server_display_name = server_display_names.get(self.server_type, self.server_type)
 
@@ -190,9 +194,9 @@ class MCPAssistConversationEntity(ConversationEntity):
     def base_url_dynamic(self) -> str:
         """Get base URL (dynamic for local servers)."""
         if self.server_type in [SERVER_TYPE_OPENAI, SERVER_TYPE_GEMINI, SERVER_TYPE_ANTHROPIC, SERVER_TYPE_OPENROUTER]:
-            return self.base_url  # Static
+            return self.base_url  # Static cloud URLs
         else:
-            # LM Studio/Ollama - read dynamically
+            # LM Studio, Ollama, llamacpp, Clawdbot - read dynamically
             return self.entry.options.get(
                 CONF_LMSTUDIO_URL,
                 self.entry.data.get(CONF_LMSTUDIO_URL, "")
@@ -206,7 +210,12 @@ class MCPAssistConversationEntity(ConversationEntity):
     @property
     def model_name(self) -> str:
         """Get model name (dynamic)."""
-        return self.entry.options.get(CONF_MODEL_NAME, self.entry.data.get(CONF_MODEL_NAME, ""))
+        base_model = self.entry.options.get(CONF_MODEL_NAME, self.entry.data.get(CONF_MODEL_NAME, ""))
+        # Format for provider-specific requirements
+        if self.server_type == SERVER_TYPE_CLAWDBOT:
+            if not base_model.startswith("clawdbot:"):
+                return f"clawdbot:{base_model}"
+        return base_model
 
     @property
     def mcp_port(self) -> int:
@@ -293,6 +302,7 @@ class MCPAssistConversationEntity(ConversationEntity):
             SERVER_TYPE_GEMINI: "Gemini",
             SERVER_TYPE_ANTHROPIC: "Claude",
             SERVER_TYPE_OPENROUTER: "OpenRouter",
+            SERVER_TYPE_CLAWDBOT: "Clawdbot",
         }.get(self.server_type, "LLM")
         return f"Powered by {server_name} with MCP entity discovery"
 
@@ -338,6 +348,11 @@ class MCPAssistConversationEntity(ConversationEntity):
         """Return profile name."""
         return self.entry.data.get(CONF_PROFILE_NAME, "MCP Assist")
 
+    @property
+    def timeout(self) -> int:
+        """Get request timeout in seconds (dynamic)."""
+        return self.entry.options.get(CONF_TIMEOUT, self.entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
+
     async def async_added_to_hass(self) -> None:
         """When entity is added to Home Assistant."""
         await super().async_added_to_hass()
@@ -370,6 +385,7 @@ class MCPAssistConversationEntity(ConversationEntity):
             SERVER_TYPE_GEMINI: "Gemini",
             SERVER_TYPE_ANTHROPIC: "Claude",
             SERVER_TYPE_OPENROUTER: "OpenRouter",
+            SERVER_TYPE_CLAWDBOT: "Clawdbot",
         }.get(self.server_type, "the LLM server")
 
     def _get_friendly_error_message(self, error: Exception) -> str:
@@ -529,6 +545,10 @@ class MCPAssistConversationEntity(ConversationEntity):
 
             # Build conversation messages
             messages = self._build_messages(system_prompt, user_input.text, history)
+
+            # Store conversation_id for Clawdbot session management
+            self._current_conversation_id = conversation_id
+
             if self.debug_mode:
                 _LOGGER.info(f"📨 Messages built: {len(messages)} messages")
                 for i, msg in enumerate(messages):
@@ -874,10 +894,12 @@ class MCPAssistConversationEntity(ConversationEntity):
         """Build message list for LM Studio."""
         messages = [{"role": "system", "content": system_prompt}]
 
-        # Add conversation history (last 5 turns)
-        for turn in history[-5:]:
-            messages.append({"role": "user", "content": turn["user"]})
-            messages.append({"role": "assistant", "content": turn["assistant"]})
+        # For Clawdbot, skip history - server manages context via user field
+        if self.server_type != SERVER_TYPE_CLAWDBOT:
+            # Add conversation history (last 5 turns)
+            for turn in history[-5:]:
+                messages.append({"role": "user", "content": turn["user"]})
+                messages.append({"role": "assistant", "content": turn["assistant"]})
 
         # Add current user message
         messages.append({"role": "user", "content": user_text})
@@ -1191,7 +1213,7 @@ class MCPAssistConversationEntity(ConversationEntity):
         _LOGGER.info(f"🧪 Model: {self.model_name}")
 
         try:
-            timeout = aiohttp.ClientTimeout(total=5)
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 url = f"{self.base_url_dynamic}/v1/chat/completions"
                 headers = self._get_auth_headers()
@@ -1238,8 +1260,11 @@ class MCPAssistConversationEntity(ConversationEntity):
                 "HTTP-Referer": "https://github.com/mike-nott/mcp-assist",
                 "X-Title": "MCP Assist for Home Assistant"
             }
+        elif self.server_type == SERVER_TYPE_CLAWDBOT:
+            # Clawdbot uses Bearer token
+            return {"Authorization": f"Bearer {self.api_key}"}
         else:
-            # Local servers (LM Studio, Ollama) don't need auth
+            # Local servers (LM Studio, Ollama, llamacpp) don't need auth
             return {}
 
     def _build_openai_payload(
@@ -1248,7 +1273,7 @@ class MCPAssistConversationEntity(ConversationEntity):
         tools: Optional[List[Dict[str, Any]]] = None,
         stream: bool = True
     ) -> Dict[str, Any]:
-        """Build OpenAI-compatible payload for LM Studio, OpenAI, Gemini, Anthropic."""
+        """Build OpenAI-compatible payload for LM Studio, OpenAI, Gemini, Anthropic, Clawdbot."""
         payload = {
             "model": self.model_name,
             "messages": messages,
@@ -1270,6 +1295,10 @@ class MCPAssistConversationEntity(ConversationEntity):
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
+
+        # Clawdbot: Add session management via user field
+        if self.server_type == SERVER_TYPE_CLAWDBOT and hasattr(self, '_current_conversation_id'):
+            payload["user"] = self._current_conversation_id
 
         return payload
 
@@ -1428,7 +1457,7 @@ class MCPAssistConversationEntity(ConversationEntity):
             current_thought_signature = None  # Track Gemini 3 thought signatures
 
             try:
-                timeout = aiohttp.ClientTimeout(total=30)
+                timeout = aiohttp.ClientTimeout(total=self.timeout)
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     # Use appropriate endpoint based on server type
                     if self.server_type == SERVER_TYPE_OLLAMA:
@@ -1722,7 +1751,7 @@ class MCPAssistConversationEntity(ConversationEntity):
 
             clean_payload = clean_for_json_http(payload)
 
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 # Use appropriate endpoint based on server type
                 if self.server_type == SERVER_TYPE_OLLAMA:

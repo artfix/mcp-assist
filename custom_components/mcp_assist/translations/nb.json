@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Modell og instruksjoner",
-        "description": "Velg en modell og tilpass systeminstruksjonene. Modeller lastes automatisk fra serveren din.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Modellnavn",
           "system_prompt": "Systeminstruksjoner",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Avanserte innstillinger",
-        "description": "Konfigurer temperatur, tokenbegrensninger og andre avanserte alternativer.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Temperatur",
           "max_tokens": "Maks svartokens",
@@ -39,6 +39,7 @@
           "response_mode": "Svarmodus",
           "follow_up_phrases": "Oppfolgingsfraser",
           "end_words": "Avslutt samtale-ord",
+          "timeout": "Svartidsavbrudd",
           "debug_mode": "Feilsokingsmodus",
           "ollama_keep_alive": "Hold Ollama aktiv",
           "ollama_num_ctx": "Ollama kontekstvindu",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Profilinnstillinger",
-        "description": "Konfigurer denne samtaleprofilen. Disse innstillingene pavirker kun denne profilen.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Profilnavn",
           "lmstudio_url": "Server-URL",
@@ -93,6 +94,7 @@
           "response_mode": "Svarmodus",
           "follow_up_phrases": "Oppfolgingsfraser",
           "end_words": "Avslutt samtale-ord",
+          "timeout": "Svartidsavbrudd",
           "debug_mode": "Feilsokingsmodus",
           "ollama_keep_alive": "Hold Ollama aktiv",
           "ollama_num_ctx": "Ollama kontekstvindu",

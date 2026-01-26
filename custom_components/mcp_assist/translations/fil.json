@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Modelo at mga Tagubilin",
-        "description": "Pumili ng modelo at i-customize ang mga tagubilin ng sistema. Awtomatikong nilo-load ang mga modelo mula sa iyong server.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Pangalan ng Modelo",
           "system_prompt": "Mga Tagubilin ng Sistema",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Mga Advanced na Setting",
-        "description": "I-configure ang temperatura, mga limitasyon ng token, at iba pang advanced na opsyon.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Temperatura",
           "max_tokens": "Max na Token ng Tugon",
@@ -39,6 +39,7 @@
           "response_mode": "Mode ng Tugon",
           "follow_up_phrases": "Mga Follow-up na Parirala",
           "end_words": "Mga Salita para Tapusin ang Usapan",
+          "timeout": "Response Time Out",
           "debug_mode": "Debug Mode",
           "ollama_keep_alive": "Panatilihing Aktibo ang Ollama",
           "ollama_num_ctx": "Ollama Context Window",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Mga Setting ng Profile",
-        "description": "I-configure ang profile ng usapan na ito. Ang mga setting na ito ay nakakaapekto lamang sa profile na ito.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Pangalan ng Profile",
           "lmstudio_url": "URL ng Server",
@@ -93,6 +94,7 @@
           "response_mode": "Mode ng Tugon",
           "follow_up_phrases": "Mga Follow-up na Parirala",
           "end_words": "Mga Salita para Tapusin ang Usapan",
+          "timeout": "Response Time Out",
           "debug_mode": "Debug Mode",
           "ollama_keep_alive": "Panatilihing Aktibo ang Ollama",
           "ollama_num_ctx": "Ollama Context Window",

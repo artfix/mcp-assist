@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Modell och instruktioner",
-        "description": "Valj en modell och anpassa systeminstruktionerna. Modeller laddas automatiskt fran din server.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Modellnamn",
           "system_prompt": "Systeminstruktioner",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Avancerade installningar",
-        "description": "Konfigurera temperatur, tokenbegransningar och andra avancerade alternativ.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Temperatur",
           "max_tokens": "Max svarstoken",
@@ -39,6 +39,7 @@
           "response_mode": "Svarslage",
           "follow_up_phrases": "Uppfoljningsfraser",
           "end_words": "Avsluta konversation-ord",
+          "timeout": "Svarstimeout",
           "debug_mode": "Felsokningslage",
           "ollama_keep_alive": "Hall Ollama aktiv",
           "ollama_num_ctx": "Ollama kontextfonster",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Profilinstallningar",
-        "description": "Konfigurera denna konversationsprofil. Dessa installningar paverkar endast denna profil.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Profilnamn",
           "lmstudio_url": "Server-URL",
@@ -93,6 +94,7 @@
           "response_mode": "Svarslage",
           "follow_up_phrases": "Uppfoljningsfraser",
           "end_words": "Avsluta konversation-ord",
+          "timeout": "Svarstimeout",
           "debug_mode": "Felsokningslage",
           "ollama_keep_alive": "Hall Ollama aktiv",
           "ollama_num_ctx": "Ollama kontextfonster",

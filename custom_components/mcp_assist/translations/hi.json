@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "मॉडल और प्रॉम्प्ट",
-        "description": "मॉडल चुनें और सिस्टम प्रॉम्प्ट को अनुकूलित करें। मॉडल आपके सर्वर से स्वचालित रूप से लोड होते हैं।",
+        "description": "{server_info}",
         "data": {
           "model_name": "मॉडल नाम",
           "system_prompt": "सिस्टम प्रॉम्प्ट",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "उन्नत सेटिंग्स",
-        "description": "तापमान, टोकन सीमाएं और अन्य उन्नत विकल्प कॉन्फ़िगर करें।",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "तापमान",
           "max_tokens": "अधिकतम प्रतिक्रिया टोकन",
@@ -39,6 +39,7 @@
           "response_mode": "प्रतिक्रिया मोड",
           "follow_up_phrases": "अनुवर्ती वाक्यांश",
           "end_words": "बातचीत समाप्त करने के शब्द",
+          "timeout": "प्रतिक्रिया समय समाप्त",
           "debug_mode": "डीबग मोड",
           "ollama_keep_alive": "Ollama जीवित रखें",
           "ollama_num_ctx": "Ollama संदर्भ विंडो",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "प्रोफ़ाइल सेटिंग्स",
-        "description": "इस वार्तालाप प्रोफ़ाइल को कॉन्फ़िगर करें। ये सेटिंग्स केवल इस प्रोफ़ाइल को प्रभावित करती हैं।",
+        "description": "{server_info}",
         "data": {
           "profile_name": "प्रोफ़ाइल नाम",
           "lmstudio_url": "सर्वर URL",
@@ -93,6 +94,7 @@
           "response_mode": "प्रतिक्रिया मोड",
           "follow_up_phrases": "अनुवर्ती वाक्यांश",
           "end_words": "बातचीत समाप्त करने के शब्द",
+          "timeout": "प्रतिक्रिया समय समाप्त",
           "debug_mode": "डीबग मोड",
           "ollama_keep_alive": "Ollama जीवित रखें",
           "ollama_num_ctx": "Ollama संदर्भ विंडो",

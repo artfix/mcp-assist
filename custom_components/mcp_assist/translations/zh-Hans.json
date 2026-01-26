@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "模型和提示词",
-        "description": "选择模型并自定义系统提示词。模型会自动从您的服务器加载。",
+        "description": "{server_info}",
         "data": {
           "model_name": "模型名称",
           "system_prompt": "系统提示词",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "高级设置",
-        "description": "配置温度、令牌限制和其他高级选项。",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "温度",
           "max_tokens": "最大响应令牌数",
@@ -39,6 +39,7 @@
           "response_mode": "响应模式",
           "follow_up_phrases": "后续跟进短语",
           "end_words": "结束对话词语",
+          "timeout": "响应超时",
           "debug_mode": "调试模式",
           "ollama_keep_alive": "保持Ollama活跃",
           "ollama_num_ctx": "Ollama上下文窗口",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "配置文件设置",
-        "description": "配置此对话配置文件。这些设置仅影响此配置文件。",
+        "description": "{server_info}",
         "data": {
           "profile_name": "配置文件名称",
           "lmstudio_url": "服务器URL",
@@ -93,6 +94,7 @@
           "response_mode": "响应模式",
           "follow_up_phrases": "后续跟进短语",
           "end_words": "结束对话词语",
+          "timeout": "响应超时",
           "debug_mode": "调试模式",
           "ollama_keep_alive": "保持Ollama活跃",
           "ollama_num_ctx": "Ollama上下文窗口",

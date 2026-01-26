@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Model & Prompts",
-        "description": "Select a model and customize the system prompt. Models are automatically loaded from your server.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Model Name",
           "system_prompt": "System Prompt",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Advanced Settings",
-        "description": "Configure temperature, token limits, and other advanced options.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Temperature",
           "max_tokens": "Max Response Tokens",
@@ -39,6 +39,7 @@
           "response_mode": "Response Mode",
           "follow_up_phrases": "Follow-up Phrases",
           "end_words": "End Conversation Words",
+          "timeout": "Response Time Out",
           "debug_mode": "Debug Mode",
           "ollama_keep_alive": "Ollama Keep Alive",
           "ollama_num_ctx": "Ollama Context Window",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Profile Settings",
-        "description": "Configure this conversation profile. These settings only affect this profile.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Profile Name",
           "lmstudio_url": "Server URL",
@@ -93,6 +94,7 @@
           "response_mode": "Response Mode",
           "follow_up_phrases": "Follow-up Phrases",
           "end_words": "End Conversation Words",
+          "timeout": "Response Time Out",
           "debug_mode": "Debug Mode",
           "ollama_keep_alive": "Ollama Keep Alive",
           "ollama_num_ctx": "Ollama Context Window",

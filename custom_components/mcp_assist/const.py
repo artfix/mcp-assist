@@ -11,6 +11,7 @@ SERVER_TYPE_OPENAI = "openai"
 SERVER_TYPE_GEMINI = "gemini"
 SERVER_TYPE_ANTHROPIC = "anthropic"
 SERVER_TYPE_OPENROUTER = "openrouter"
+SERVER_TYPE_CLAWDBOT = "clawdbot"
 
 # Configuration keys
 CONF_PROFILE_NAME = "profile_name"
@@ -40,12 +41,14 @@ CONF_OLLAMA_NUM_CTX = "ollama_num_ctx"
 CONF_FOLLOW_UP_PHRASES = "follow_up_phrases"
 CONF_END_WORDS = "end_words"
 CONF_CLEAN_RESPONSES = "clean_responses"
+CONF_TIMEOUT = "timeout"
 
 # Default values
 DEFAULT_SERVER_TYPE = "lmstudio"
 DEFAULT_LMSTUDIO_URL = "http://localhost:1234"
 DEFAULT_LLAMACPP_URL = "http://localhost:8080"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
+DEFAULT_CLAWDBOT_URL = "http://localhost:18789"
 DEFAULT_MCP_PORT = 8090
 DEFAULT_API_KEY = ""
 
@@ -76,6 +79,7 @@ DEFAULT_OLLAMA_NUM_CTX = 0  # 0 = use model default
 DEFAULT_FOLLOW_UP_PHRASES = "anything else, what else, would you, do you, should i, can i, which, how can, what about, is there"
 DEFAULT_END_WORDS = "stop, cancel, no, nope, thanks, thank you, bye, goodbye, done, never mind, nevermind, forget it, that's all, that's it"
 DEFAULT_CLEAN_RESPONSES = False
+DEFAULT_TIMEOUT = 30
 
 # MCP Server settings
 MCP_SERVER_NAME = "ha-entity-discovery"
@@ -135,6 +139,7 @@ DEFAULT_TECHNICAL_PROMPT = """You are controlling a Home Assistant smart home sy
 - **set_conversation_state**: indicate if expecting user response
 - **search**: search the web for current information
 - **read_url**: read and extract content from web pages
+- **IMPORTANT**: call_service is not available - use perform_action instead
 
 ## Scripts (use run_script tool)
 Scripts can perform complex operations and return data. **CRITICAL:** Always discover scripts first to get the correct entity ID.

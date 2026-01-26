@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Malli ja ohjeet",
-        "description": "Valitse malli ja mukauta jarjestelmaohjeet. Mallit ladataan automaattisesti palvelimeltasi.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Mallin nimi",
           "system_prompt": "Jarjestelmaohjeet",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Lisaasetukset",
-        "description": "Maarita lampotila, token-rajat ja muut lisaasetukset.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Lampotila",
           "max_tokens": "Vastauksen enimmais-tokenit",
@@ -39,6 +39,7 @@
           "response_mode": "Vastaustila",
           "follow_up_phrases": "Jatkokysymysfraasit",
           "end_words": "Keskustelun lopetusSanat",
+          "timeout": "Vastauksen aikakatkaisu",
           "debug_mode": "Virheenkorjaustila",
           "ollama_keep_alive": "Pida Ollama aktiivisena",
           "ollama_num_ctx": "Ollaman konteksti-ikkuna",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Profiilin asetukset",
-        "description": "Maarita tama keskusteluprofiili. Nama asetukset vaikuttavat vain tahan profiiliin.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Profiilin nimi",
           "lmstudio_url": "Palvelimen URL",
@@ -93,6 +94,7 @@
           "response_mode": "Vastaustila",
           "follow_up_phrases": "Jatkokysymysfraasit",
           "end_words": "Keskustelun lopetusSanat",
+          "timeout": "Vastauksen aikakatkaisu",
           "debug_mode": "Virheenkorjaustila",
           "ollama_keep_alive": "Pida Ollama aktiivisena",
           "ollama_num_ctx": "Ollaman konteksti-ikkuna",

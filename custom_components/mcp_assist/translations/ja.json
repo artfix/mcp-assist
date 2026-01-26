@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "モデルとプロンプト",
-        "description": "モデルを選択し、システムプロンプトをカスタマイズします。モデルはサーバーから自動的に読み込まれます。",
+        "description": "{server_info}",
         "data": {
           "model_name": "モデル名",
           "system_prompt": "システムプロンプト",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "詳細設定",
-        "description": "温度、トークン制限、その他の詳細オプションを設定します。",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "温度",
           "max_tokens": "最大応答トークン数",
@@ -39,6 +39,7 @@
           "response_mode": "応答モード",
           "follow_up_phrases": "フォローアップフレーズ",
           "end_words": "会話終了ワード",
+          "timeout": "応答タイムアウト",
           "debug_mode": "デバッグモード",
           "ollama_keep_alive": "Ollamaを維持",
           "ollama_num_ctx": "Ollamaコンテキストウィンドウ",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "プロファイル設定",
-        "description": "この会話プロファイルを設定します。これらの設定はこのプロファイルにのみ影響します。",
+        "description": "{server_info}",
         "data": {
           "profile_name": "プロファイル名",
           "lmstudio_url": "サーバーURL",
@@ -93,6 +94,7 @@
           "response_mode": "応答モード",
           "follow_up_phrases": "フォローアップフレーズ",
           "end_words": "会話終了ワード",
+          "timeout": "応答タイムアウト",
           "debug_mode": "デバッグモード",
           "ollama_keep_alive": "Ollamaを維持",
           "ollama_num_ctx": "Ollamaコンテキストウィンドウ",

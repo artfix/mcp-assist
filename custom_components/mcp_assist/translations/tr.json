@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Model ve Yonergeler",
-        "description": "Bir model secin ve sistem yonergelerini ozellestirin. Modeller sunucunuzdan otomatik olarak yuklenir.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Model Adi",
           "system_prompt": "Sistem Yonergeleri",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Gelismis Ayarlar",
-        "description": "Sicaklik, token sinirlari ve diger gelismis secenekleri yapilandirin.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Sicaklik",
           "max_tokens": "Maksimum Yanit Tokenleri",
@@ -39,6 +39,7 @@
           "response_mode": "Yanit Modu",
           "follow_up_phrases": "Takip Ifadeleri",
           "end_words": "Konusmayi Bitirme Kelimeleri",
+          "timeout": "Yanit Zaman Asimi",
           "debug_mode": "Hata Ayiklama Modu",
           "ollama_keep_alive": "Ollama'yi Aktif Tut",
           "ollama_num_ctx": "Ollama Baglam Penceresi",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Profil Ayarlari",
-        "description": "Bu konusma profilini yapilandirin. Bu ayarlar yalnizca bu profili etkiler.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Profil Adi",
           "lmstudio_url": "Sunucu URL'si",
@@ -93,6 +94,7 @@
           "response_mode": "Yanit Modu",
           "follow_up_phrases": "Takip Ifadeleri",
           "end_words": "Konusmayi Bitirme Kelimeleri",
+          "timeout": "Yanit Zaman Asimi",
           "debug_mode": "Hata Ayiklama Modu",
           "ollama_keep_alive": "Ollama'yi Aktif Tut",
           "ollama_num_ctx": "Ollama Baglam Penceresi",

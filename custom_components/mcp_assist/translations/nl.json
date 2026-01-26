@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Model & instructies",
-        "description": "Selecteer een model en pas de systeeminstructies aan. Modellen worden automatisch geladen vanaf je server.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Modelnaam",
           "system_prompt": "Systeeminstructies",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Geavanceerde instellingen",
-        "description": "Configureer temperatuur, tokenlimieten en andere geavanceerde opties.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Temperatuur",
           "max_tokens": "Maximale antwoordtokens",
@@ -39,6 +39,7 @@
           "response_mode": "Antwoordmodus",
           "follow_up_phrases": "Vervolgzinnen",
           "end_words": "Gesprek-beeindigingswoorden",
+          "timeout": "Antwoord time-out",
           "debug_mode": "Debugmodus",
           "ollama_keep_alive": "Ollama actief houden",
           "ollama_num_ctx": "Ollama contextvenster",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Profielinstellingen",
-        "description": "Configureer dit gespreksprofiel. Deze instellingen zijn alleen van invloed op dit profiel.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Profielnaam",
           "lmstudio_url": "Server-URL",
@@ -93,6 +94,7 @@
           "response_mode": "Antwoordmodus",
           "follow_up_phrases": "Vervolgzinnen",
           "end_words": "Gesprek-beeindigingswoorden",
+          "timeout": "Antwoord time-out",
           "debug_mode": "Debugmodus",
           "ollama_keep_alive": "Ollama actief houden",
           "ollama_num_ctx": "Ollama contextvenster",

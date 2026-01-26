@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Model a instrukce",
-        "description": "Vyberte model a upravte systemove instrukce. Modely se automaticky nacitaji z vaseho serveru.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Nazev modelu",
           "system_prompt": "Systemove instrukce",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Pokrocila nastaveni",
-        "description": "Nakonfigurujte teplotu, limity tokenu a dalsi pokrocile moznosti.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Teplota",
           "max_tokens": "Max tokenu odpovedi",
@@ -39,6 +39,7 @@
           "response_mode": "Rezim odpovedi",
           "follow_up_phrases": "Navazujici fraze",
           "end_words": "Slova pro ukonceni konverzace",
+          "timeout": "Casovy limit odpovedi",
           "debug_mode": "Rezim ladeni",
           "ollama_keep_alive": "Udrzovat Ollama aktivni",
           "ollama_num_ctx": "Kontextove okno Ollama",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Nastaveni profilu",
-        "description": "Nakonfigurujte tento konverzacni profil. Tato nastaveni ovlivnuji pouze tento profil.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Nazev profilu",
           "lmstudio_url": "URL serveru",
@@ -93,6 +94,7 @@
           "response_mode": "Rezim odpovedi",
           "follow_up_phrases": "Navazujici fraze",
           "end_words": "Slova pro ukonceni konverzace",
+          "timeout": "Casovy limit odpovedi",
           "debug_mode": "Rezim ladeni",
           "ollama_keep_alive": "Udrzovat Ollama aktivni",
           "ollama_num_ctx": "Kontextove okno Ollama",

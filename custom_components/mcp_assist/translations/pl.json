@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Model i instrukcje",
-        "description": "Wybierz model i dostosuj instrukcje systemowe. Modele są automatycznie ładowane z Twojego serwera.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Nazwa modelu",
           "system_prompt": "Instrukcje systemowe",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Ustawienia zaawansowane",
-        "description": "Skonfiguruj temperaturę, limity tokenów i inne zaawansowane opcje.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Temperatura",
           "max_tokens": "Maksymalna liczba tokenów odpowiedzi",
@@ -39,6 +39,7 @@
           "response_mode": "Tryb odpowiedzi",
           "follow_up_phrases": "Frazy kontynuacji",
           "end_words": "Słowa kończące rozmowę",
+          "timeout": "Limit czasu odpowiedzi",
           "debug_mode": "Tryb debugowania",
           "ollama_keep_alive": "Utrzymuj Ollama aktywne",
           "ollama_num_ctx": "Okno kontekstu Ollama",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Ustawienia profilu",
-        "description": "Skonfiguruj ten profil konwersacji. Te ustawienia dotyczą tylko tego profilu.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Nazwa profilu",
           "lmstudio_url": "Adres URL serwera",
@@ -93,6 +94,7 @@
           "response_mode": "Tryb odpowiedzi",
           "follow_up_phrases": "Frazy kontynuacji",
           "end_words": "Słowa kończące rozmowę",
+          "timeout": "Limit czasu odpowiedzi",
           "debug_mode": "Tryb debugowania",
           "ollama_keep_alive": "Utrzymuj Ollama aktywne",
           "ollama_num_ctx": "Okno kontekstu Ollama",

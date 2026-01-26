@@ -20,7 +20,7 @@
       },
       "model": {
         "title": "Модель и инструкции",
-        "description": "Выберите модель и настройте системные инструкции. Модели автоматически загружаются с вашего сервера.",
+        "description": "{server_info}",
         "data": {
           "model_name": "Название модели",
           "system_prompt": "Системные инструкции",
@@ -29,7 +29,7 @@
       },
       "advanced": {
         "title": "Расширенные настройки",
-        "description": "Настройте температуру, лимиты токенов и другие расширенные параметры.",
+        "description": "{advanced_info}",
         "data": {
           "temperature": "Температура",
           "max_tokens": "Максимум токенов ответа",
@@ -39,6 +39,7 @@
           "response_mode": "Режим ответа",
           "follow_up_phrases": "Фразы продолжения",
           "end_words": "Слова завершения разговора",
+          "timeout": "Тайм-аут ответа",
           "debug_mode": "Режим отладки",
           "ollama_keep_alive": "Поддерживать Ollama активным",
           "ollama_num_ctx": "Контекстное окно Ollama",
@@ -77,7 +78,7 @@
     "step": {
       "init": {
         "title": "Настройки профиля",
-        "description": "Настройте этот профиль разговора. Эти настройки влияют только на этот профиль.",
+        "description": "{server_info}",
         "data": {
           "profile_name": "Название профиля",
           "lmstudio_url": "URL сервера",
@@ -93,6 +94,7 @@
           "response_mode": "Режим ответа",
           "follow_up_phrases": "Фразы продолжения",
           "end_words": "Слова завершения разговора",
+          "timeout": "Тайм-аут ответа",
           "debug_mode": "Режим отладки",
           "ollama_keep_alive": "Поддерживать Ollama активным",
           "ollama_num_ctx": "Контекстное окно Ollama",
