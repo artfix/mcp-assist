@@ -11,7 +11,8 @@ SERVER_TYPE_OPENAI = "openai"
 SERVER_TYPE_GEMINI = "gemini"
 SERVER_TYPE_ANTHROPIC = "anthropic"
 SERVER_TYPE_OPENROUTER = "openrouter"
-SERVER_TYPE_CLAWDBOT = "clawdbot"
+SERVER_TYPE_MOLTBOT = "moltbot"
+SERVER_TYPE_VLLM = "vllm"
 
 # Configuration keys
 CONF_PROFILE_NAME = "profile_name"
@@ -48,7 +49,8 @@ DEFAULT_SERVER_TYPE = "lmstudio"
 DEFAULT_LMSTUDIO_URL = "http://localhost:1234"
 DEFAULT_LLAMACPP_URL = "http://localhost:8080"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
-DEFAULT_CLAWDBOT_URL = "http://localhost:18789"
+DEFAULT_MOLTBOT_URL = "http://localhost:18789"
+DEFAULT_VLLM_URL = "http://localhost:8000"
 DEFAULT_MCP_PORT = 8090
 DEFAULT_API_KEY = ""
 
@@ -95,7 +97,6 @@ Do NOT ask follow-up questions. Complete the task and end immediately.
 
 ## Ending Conversations
 Always end after completing the task.""",
-
     "default": """## Follow-up Questions
 Generate contextually appropriate follow-up questions naturally:
 - After single device actions: Create a natural follow-up asking if the user needs help with anything else (vary phrasing each time)
@@ -108,7 +109,6 @@ When asking a question, use the set_conversation_state tool to indicate you're e
 
 ## Ending Conversations
 After completing the task, end the conversation unless a natural follow-up is relevant.""",
-
     "always": """## Follow-up Questions
 Generate contextually appropriate follow-up questions naturally:
 - After single device actions: Create a natural follow-up asking if the user needs help with anything else (vary phrasing each time)
@@ -118,7 +118,7 @@ Always vary your phrasing - never repeat the same question twice in a conversati
 When asking a question, use the set_conversation_state tool to indicate you're expecting a response.
 
 ## Ending Conversations
-When user indicates they're done, acknowledge and end naturally."""
+When user indicates they're done, acknowledge and end naturally.""",
 }
 
 DEFAULT_TECHNICAL_PROMPT = """You are controlling a Home Assistant smart home system. You have access to sensors, lights, switches, and other devices throughout the home.

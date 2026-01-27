@@ -64,12 +64,14 @@ from .const import (
     SERVER_TYPE_GEMINI,
     SERVER_TYPE_ANTHROPIC,
     SERVER_TYPE_OPENROUTER,
-    SERVER_TYPE_CLAWDBOT,
+    SERVER_TYPE_MOLTBOT,
+    SERVER_TYPE_VLLM,
     DEFAULT_SERVER_TYPE,
     DEFAULT_LMSTUDIO_URL,
     DEFAULT_LLAMACPP_URL,
     DEFAULT_OLLAMA_URL,
-    DEFAULT_CLAWDBOT_URL,
+    DEFAULT_MOLTBOT_URL,
+    DEFAULT_VLLM_URL,
     DEFAULT_MCP_PORT,
     DEFAULT_MODEL_NAME,
     DEFAULT_SYSTEM_PROMPT,
@@ -121,7 +123,11 @@ async def fetch_models_from_lmstudio(hass: HomeAssistant, url: str) -> list[str]
                 models = await resp.json()
                 model_ids = [m.get("id", "") for m in models.get("data", [])]
                 sorted_models = sorted(model_ids) if model_ids else []
-                _LOGGER.info("✨ FETCH: Returning %d sorted models: %s", len(sorted_models), sorted_models)
+                _LOGGER.info(
+                    "✨ FETCH: Returning %d sorted models: %s",
+                    len(sorted_models),
+                    sorted_models,
+                )
                 return sorted_models
     except Exception as err:
         _LOGGER.error("💥 FETCH: Exception during fetch: %s", err, exc_info=True)
@@ -135,19 +141,22 @@ async def fetch_models_from_openai(hass: HomeAssistant, api_key: str) -> list[st
         timeout = aiohttp.ClientTimeout(total=10)
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         async with aiohttp.ClientSession(timeout=timeout) as session:
             _LOGGER.info("📡 FETCH: Requesting OpenAI models")
             async with session.get(
-                f"{OPENAI_BASE_URL}/v1/models",
-                headers=headers
+                f"{OPENAI_BASE_URL}/v1/models", headers=headers
             ) as resp:
                 _LOGGER.info("📥 FETCH: OpenAI response status %d", resp.status)
                 if resp.status != 200:
                     error_text = await resp.text()
-                    _LOGGER.warning("⚠️ FETCH: OpenAI API error %d: %s", resp.status, error_text[:200])
+                    _LOGGER.warning(
+                        "⚠️ FETCH: OpenAI API error %d: %s",
+                        resp.status,
+                        error_text[:200],
+                    )
                     return []
 
                 data = await resp.json()
@@ -179,7 +188,11 @@ async def fetch_models_from_gemini(hass: HomeAssistant, api_key: str) -> list[st
                 _LOGGER.info("📥 FETCH: Gemini response status %d", resp.status)
                 if resp.status != 200:
                     error_text = await resp.text()
-                    _LOGGER.warning("⚠️ FETCH: Gemini API error %d: %s", resp.status, error_text[:200])
+                    _LOGGER.warning(
+                        "⚠️ FETCH: Gemini API error %d: %s",
+                        resp.status,
+                        error_text[:200],
+                    )
                     return []
 
                 data = await resp.json()
@@ -194,7 +207,9 @@ async def fetch_models_from_gemini(hass: HomeAssistant, api_key: str) -> list[st
 
                 # Filter for gemini models only
                 gemini_models = [m for m in all_models if "gemini" in m.lower()]
-                sorted_models = sorted(gemini_models, reverse=True) if gemini_models else []
+                sorted_models = (
+                    sorted(gemini_models, reverse=True) if gemini_models else []
+                )
                 _LOGGER.info("✨ FETCH: Found %d Gemini models", len(sorted_models))
                 return sorted_models
     except Exception as err:
@@ -210,19 +225,22 @@ async def fetch_models_from_openrouter(hass: HomeAssistant, api_key: str) -> lis
         headers = {
             "Authorization": f"Bearer {api_key}",
             "HTTP-Referer": "https://github.com/mike-nott/mcp-assist",
-            "X-Title": "MCP Assist for Home Assistant"
+            "X-Title": "MCP Assist for Home Assistant",
         }
 
         async with aiohttp.ClientSession(timeout=timeout) as session:
             _LOGGER.info("📡 FETCH: Requesting OpenRouter models")
             async with session.get(
-                f"{OPENROUTER_BASE_URL}/v1/models",
-                headers=headers
+                f"{OPENROUTER_BASE_URL}/v1/models", headers=headers
             ) as resp:
                 _LOGGER.info("📥 FETCH: OpenRouter response status %d", resp.status)
                 if resp.status != 200:
                     error_text = await resp.text()
-                    _LOGGER.warning("⚠️ FETCH: OpenRouter API error %d: %s", resp.status, error_text[:200])
+                    _LOGGER.warning(
+                        "⚠️ FETCH: OpenRouter API error %d: %s",
+                        resp.status,
+                        error_text[:200],
+                    )
                     return []
 
                 data = await resp.json()
@@ -250,7 +268,7 @@ def validate_allowed_ips(allowed_ips_str: str) -> tuple[bool, str]:
         return True, ""
 
     # Parse comma-separated values
-    ip_list = [ip.strip() for ip in allowed_ips_str.split(',') if ip.strip()]
+    ip_list = [ip.strip() for ip in allowed_ips_str.split(",") if ip.strip()]
 
     for ip_entry in ip_list:
         try:
@@ -263,24 +281,27 @@ def validate_allowed_ips(allowed_ips_str: str) -> tuple[bool, str]:
     return True, ""
 
 
-STEP_USER_DATA_SCHEMA = vol.Schema({
-    vol.Required(CONF_PROFILE_NAME): str,
-    vol.Required(CONF_SERVER_TYPE, default=DEFAULT_SERVER_TYPE): SelectSelector(
-        SelectSelectorConfig(
-            options=[
-                {"value": "lmstudio", "label": "LM Studio"},
-                {"value": "llamacpp", "label": "llama.cpp"},
-                {"value": "ollama", "label": "Ollama"},
-                {"value": "openai", "label": "OpenAI"},
-                {"value": "gemini", "label": "Google Gemini"},
-                {"value": "anthropic", "label": "Anthropic (Claude)"},
-                {"value": "openrouter", "label": "OpenRouter"},
-                {"value": "clawdbot", "label": "Clawdbot"},
-            ],
-            mode=SelectSelectorMode.LIST,
-        )
-    ),
-})
+STEP_USER_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_PROFILE_NAME): str,
+        vol.Required(CONF_SERVER_TYPE, default=DEFAULT_SERVER_TYPE): SelectSelector(
+            SelectSelectorConfig(
+                options=[
+                    {"value": "lmstudio", "label": "LM Studio"},
+                    {"value": "llamacpp", "label": "llama.cpp"},
+                    {"value": "ollama", "label": "Ollama"},
+                    {"value": "openai", "label": "OpenAI"},
+                    {"value": "gemini", "label": "Google Gemini"},
+                    {"value": "anthropic", "label": "Anthropic (Claude)"},
+                    {"value": "openrouter", "label": "OpenRouter"},
+                    {"value": "moltbot", "label": "Moltbot"},
+                    {"value": "vllm", "label": "vLLM"},
+                ],
+                mode=SelectSelectorMode.LIST,
+            )
+        ),
+    }
+)
 
 STEP_MCP_DATA_SCHEMA = vol.Schema(
     {
@@ -303,7 +324,9 @@ async def validate_lmstudio_connection(
             # Test models endpoint
             async with session.get(f"{url}/v1/models") as resp:
                 if resp.status != 200:
-                    raise CannotConnect(f"LM Studio not responding (status {resp.status})")
+                    raise CannotConnect(
+                        f"LM Studio not responding (status {resp.status})"
+                    )
 
                 models = await resp.json()
                 model_ids = [m.get("id", "") for m in models.get("data", [])]
@@ -316,7 +339,7 @@ async def validate_lmstudio_connection(
                     _LOGGER.warning(
                         "Model '%s' not found. Available models: %s",
                         model_name,
-                        model_ids
+                        model_ids,
                     )
 
             # Test chat completions endpoint
@@ -324,12 +347,16 @@ async def validate_lmstudio_connection(
                 "model": model_name,
                 "messages": [{"role": "user", "content": "test"}],
                 "max_tokens": 1,
-                "stream": False
+                "stream": False,
             }
 
-            async with session.post(f"{url}/v1/chat/completions", json=test_payload) as resp:
+            async with session.post(
+                f"{url}/v1/chat/completions", json=test_payload
+            ) as resp:
                 if resp.status != 200:
-                    raise InvalidModel(f"Model '{model_name}' not working (status {resp.status})")
+                    raise InvalidModel(
+                        f"Model '{model_name}' not working (status {resp.status})"
+                    )
 
     except aiohttp.ClientError as err:
         raise CannotConnect(f"Failed to connect to LM Studio: {err}") from err
@@ -386,37 +413,51 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         server_type = self.step1_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
 
         # Build schema based on server type
-        if server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA, SERVER_TYPE_CLAWDBOT]:
+        if server_type in [
+            SERVER_TYPE_LMSTUDIO,
+            SERVER_TYPE_LLAMACPP,
+            SERVER_TYPE_OLLAMA,
+            SERVER_TYPE_MOLTBOT,
+            SERVER_TYPE_VLLM,
+        ]:
             # Local servers - show URL field
             if server_type == SERVER_TYPE_OLLAMA:
                 default_url = DEFAULT_OLLAMA_URL
             elif server_type == SERVER_TYPE_LLAMACPP:
                 default_url = DEFAULT_LLAMACPP_URL
-            elif server_type == SERVER_TYPE_CLAWDBOT:
-                default_url = DEFAULT_CLAWDBOT_URL
+            elif server_type == SERVER_TYPE_MOLTBOT:
+                default_url = DEFAULT_MOLTBOT_URL
+            elif server_type == SERVER_TYPE_VLLM:
+                default_url = DEFAULT_VLLM_URL
             else:
                 default_url = DEFAULT_LMSTUDIO_URL
 
-            # Clawdbot needs both URL and API key (bearer token)
-            if server_type == SERVER_TYPE_CLAWDBOT:
-                server_schema = vol.Schema({
-                    vol.Required(CONF_LMSTUDIO_URL, default=default_url): str,
+            # Moltbot needs both URL and API key (bearer token)
+            if server_type == SERVER_TYPE_MOLTBOT:
+                server_schema = vol.Schema(
+                    {
+                        vol.Required(CONF_LMSTUDIO_URL, default=default_url): str,
+                        vol.Required(CONF_API_KEY): TextSelector(
+                            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                        ),
+                    }
+                )
+            else:
+                # Other local servers (LM Studio, Ollama, llamacpp, vLLM) - just URL
+                server_schema = vol.Schema(
+                    {
+                        vol.Required(CONF_LMSTUDIO_URL, default=default_url): str,
+                    }
+                )
+        else:
+            # Cloud providers (OpenAI, Gemini, Anthropic, OpenRouter) - show API key field
+            server_schema = vol.Schema(
+                {
                     vol.Required(CONF_API_KEY): TextSelector(
                         TextSelectorConfig(type=TextSelectorType.PASSWORD)
                     ),
-                })
-            else:
-                # Other local servers - just URL
-                server_schema = vol.Schema({
-                    vol.Required(CONF_LMSTUDIO_URL, default=default_url): str,
-                })
-        else:
-            # Cloud providers (OpenAI, Gemini, Anthropic, OpenRouter) - show API key field
-            server_schema = vol.Schema({
-                vol.Required(CONF_API_KEY): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.PASSWORD)
-                ),
-            })
+                }
+            )
 
         return self.async_show_form(
             step_id="server",
@@ -439,18 +480,22 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         server_type = self.step1_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
         models = []
 
-        # Clawdbot doesn't have /v1/models endpoint - skip model selection
-        if server_type == SERVER_TYPE_CLAWDBOT:
-            # Hardcode model to "main" and use empty system prompt (Clawdbot has its own)
-            model_schema = vol.Schema({
-                vol.Required(CONF_TECHNICAL_PROMPT, default=DEFAULT_TECHNICAL_PROMPT): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
-                ),
-            })
+        # Moltbot doesn't have /v1/models endpoint - skip model selection
+        if server_type == SERVER_TYPE_MOLTBOT:
+            # Hardcode model to "main" and use empty system prompt (Moltbot has its own)
+            model_schema = vol.Schema(
+                {
+                    vol.Required(
+                        CONF_TECHNICAL_PROMPT, default=DEFAULT_TECHNICAL_PROMPT
+                    ): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
+                    ),
+                }
+            )
             # Store hardcoded values
             self.step3_data = {
                 CONF_MODEL_NAME: "main",
-                CONF_SYSTEM_PROMPT: ""  # Clawdbot manages its own system prompt
+                CONF_SYSTEM_PROMPT: "",  # Moltbot manages its own system prompt
             }
 
             return self.async_show_form(
@@ -458,12 +503,19 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=model_schema,
                 errors=errors,
                 description_placeholders={
-                    "server_info": "Clawdbot's model and system prompt are configured on the Clawdbot server. Use the technical instructions below to configure how it uses MCP tools to control Home Assistant."
-                }
+                    "server_info": "Moltbot's model and system prompt are configured on the Moltbot server. Use the technical instructions below to configure how it uses MCP tools to control Home Assistant."
+                },
             )
-        elif server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA]:
+        elif server_type in [
+            SERVER_TYPE_LMSTUDIO,
+            SERVER_TYPE_LLAMACPP,
+            SERVER_TYPE_OLLAMA,
+            SERVER_TYPE_VLLM,
+        ]:
             # Local servers - fetch models from API
-            server_url = self.step2_data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL).rstrip("/")
+            server_url = self.step2_data.get(
+                CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL
+            ).rstrip("/")
             _LOGGER.debug("Attempting to fetch models from %s", server_url)
             models = await fetch_models_from_lmstudio(self.hass, server_url)
             _LOGGER.debug("Fetched %d models: %s", len(models), models)
@@ -502,39 +554,49 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if models:
             # Show dropdown with available models (custom_value allows free text input)
             _LOGGER.info("Showing model dropdown with %d models", len(models))
-            model_schema = vol.Schema({
-                vol.Required(CONF_MODEL_NAME): SelectSelector(
-                    SelectSelectorConfig(
-                        options=models,
-                        mode=SelectSelectorMode.DROPDOWN,
-                        custom_value=True,
-                    )
-                ),
-                vol.Required(
-                    CONF_SYSTEM_PROMPT,
-                    default=get_language_instruction(self.hass.config.language) or DEFAULT_SYSTEM_PROMPT
-                ): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
-                ),
-                vol.Required(CONF_TECHNICAL_PROMPT, default=DEFAULT_TECHNICAL_PROMPT): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
-                ),
-            })
+            model_schema = vol.Schema(
+                {
+                    vol.Required(CONF_MODEL_NAME): SelectSelector(
+                        SelectSelectorConfig(
+                            options=models,
+                            mode=SelectSelectorMode.DROPDOWN,
+                            custom_value=True,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_SYSTEM_PROMPT,
+                        default=get_language_instruction(self.hass.config.language)
+                        or DEFAULT_SYSTEM_PROMPT,
+                    ): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
+                    ),
+                    vol.Required(
+                        CONF_TECHNICAL_PROMPT, default=DEFAULT_TECHNICAL_PROMPT
+                    ): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
+                    ),
+                }
+            )
         else:
             # Show text input as fallback
             _LOGGER.info("No models fetched, showing text input")
-            model_schema = vol.Schema({
-                vol.Required(CONF_MODEL_NAME, default=DEFAULT_MODEL_NAME): str,
-                vol.Required(
-                    CONF_SYSTEM_PROMPT,
-                    default=get_language_instruction(self.hass.config.language) or DEFAULT_SYSTEM_PROMPT
-                ): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
-                ),
-                vol.Required(CONF_TECHNICAL_PROMPT, default=DEFAULT_TECHNICAL_PROMPT): TextSelector(
-                    TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
-                ),
-            })
+            model_schema = vol.Schema(
+                {
+                    vol.Required(CONF_MODEL_NAME, default=DEFAULT_MODEL_NAME): str,
+                    vol.Required(
+                        CONF_SYSTEM_PROMPT,
+                        default=get_language_instruction(self.hass.config.language)
+                        or DEFAULT_SYSTEM_PROMPT,
+                    ): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
+                    ),
+                    vol.Required(
+                        CONF_TECHNICAL_PROMPT, default=DEFAULT_TECHNICAL_PROMPT
+                    ): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
+                    ),
+                }
+            )
 
         return self.async_show_form(
             step_id="model",
@@ -542,7 +604,7 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={
                 "server_info": "Select a model and customize the system prompt. Models are automatically loaded from your server."
-            }
+            },
         )
 
     async def async_step_advanced(
@@ -555,16 +617,16 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         server_type = self.step1_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
 
         if user_input is not None:
-            # For Clawdbot, set defaults for hidden fields
-            if server_type == SERVER_TYPE_CLAWDBOT:
+            # For Moltbot, set defaults for hidden fields
+            if server_type == SERVER_TYPE_MOLTBOT:
                 user_input[CONF_TEMPERATURE] = DEFAULT_TEMPERATURE
                 user_input[CONF_MAX_TOKENS] = DEFAULT_MAX_TOKENS
                 user_input[CONF_MAX_HISTORY] = DEFAULT_MAX_HISTORY
                 user_input[CONF_MAX_ITERATIONS] = DEFAULT_MAX_ITERATIONS
-                user_input[CONF_RESPONSE_MODE] = "none"  # Clawdbot manages this
+                user_input[CONF_RESPONSE_MODE] = "none"  # Moltbot manages this
                 user_input[CONF_FOLLOW_UP_PHRASES] = DEFAULT_FOLLOW_UP_PHRASES
                 user_input[CONF_END_WORDS] = DEFAULT_END_WORDS
-                # Timeout is shown for Clawdbot, so use provided value or default to 60
+                # Timeout is shown for Moltbot, so use provided value or default to 60
                 if CONF_TIMEOUT not in user_input:
                     user_input[CONF_TIMEOUT] = 60
 
@@ -582,7 +644,9 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             if not errors:
                 # Check if this is the first profile (MCP server doesn't exist yet)
-                is_first_profile = "shared_mcp_server" not in self.hass.data.get(DOMAIN, {})
+                is_first_profile = "shared_mcp_server" not in self.hass.data.get(
+                    DOMAIN, {}
+                )
 
                 if is_first_profile:
                     # First profile - store step 4 data and proceed to MCP server config
@@ -604,11 +668,21 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     shared_settings = {}
                     if existing_entry:
                         shared_settings = {
-                            CONF_MCP_PORT: existing_entry.data.get(CONF_MCP_PORT, mcp_port),
-                            CONF_SEARCH_PROVIDER: existing_entry.data.get(CONF_SEARCH_PROVIDER, DEFAULT_SEARCH_PROVIDER),
-                            CONF_BRAVE_API_KEY: existing_entry.data.get(CONF_BRAVE_API_KEY, DEFAULT_BRAVE_API_KEY),
-                            CONF_ALLOWED_IPS: existing_entry.data.get(CONF_ALLOWED_IPS, DEFAULT_ALLOWED_IPS),
-                            CONF_ENABLE_GAP_FILLING: existing_entry.data.get(CONF_ENABLE_GAP_FILLING, DEFAULT_ENABLE_GAP_FILLING),
+                            CONF_MCP_PORT: existing_entry.data.get(
+                                CONF_MCP_PORT, mcp_port
+                            ),
+                            CONF_SEARCH_PROVIDER: existing_entry.data.get(
+                                CONF_SEARCH_PROVIDER, DEFAULT_SEARCH_PROVIDER
+                            ),
+                            CONF_BRAVE_API_KEY: existing_entry.data.get(
+                                CONF_BRAVE_API_KEY, DEFAULT_BRAVE_API_KEY
+                            ),
+                            CONF_ALLOWED_IPS: existing_entry.data.get(
+                                CONF_ALLOWED_IPS, DEFAULT_ALLOWED_IPS
+                            ),
+                            CONF_ENABLE_GAP_FILLING: existing_entry.data.get(
+                                CONF_ENABLE_GAP_FILLING, DEFAULT_ENABLE_GAP_FILLING
+                            ),
                         }
 
                     # Combine data from steps 1-4 + shared settings
@@ -622,7 +696,9 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
                     # Create config entry (same as before)
                     profile_name = combined_data[CONF_PROFILE_NAME]
-                    server_type = combined_data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
+                    server_type = combined_data.get(
+                        CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE
+                    )
 
                     server_display_map = {
                         SERVER_TYPE_LMSTUDIO: "LM Studio",
@@ -632,7 +708,8 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         SERVER_TYPE_GEMINI: "Gemini",
                         SERVER_TYPE_ANTHROPIC: "Claude",
                         SERVER_TYPE_OPENROUTER: "OpenRouter",
-                        SERVER_TYPE_CLAWDBOT: "Clawdbot",
+                        SERVER_TYPE_MOLTBOT: "Moltbot",
+                        SERVER_TYPE_VLLM: "vLLM",
                     }
                     server_display = server_display_map.get(server_type, "LM Studio")
 
@@ -649,11 +726,13 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         default_temp = 1.0 if server_type == SERVER_TYPE_GEMINI else DEFAULT_TEMPERATURE
 
         # Build schema based on server type
-        if server_type == SERVER_TYPE_CLAWDBOT:
-            # Clawdbot - only show Control HA, Timeout, Clean Responses, Debug
+        if server_type == SERVER_TYPE_MOLTBOT:
+            # Moltbot - only show Control HA, Timeout, Clean Responses, Debug
             advanced_schema_dict = {
                 vol.Required(CONF_CONTROL_HA, default=DEFAULT_CONTROL_HA): bool,
-                vol.Optional(CONF_CLEAN_RESPONSES, default=DEFAULT_CLEAN_RESPONSES): bool,
+                vol.Optional(
+                    CONF_CLEAN_RESPONSES, default=DEFAULT_CLEAN_RESPONSES
+                ): bool,
                 vol.Required(CONF_TIMEOUT, default=60): vol.All(
                     vol.Coerce(int), vol.Range(min=5, max=300)
                 ),
@@ -665,54 +744,67 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_TEMPERATURE, default=default_temp): vol.All(
                     vol.Coerce(float), vol.Range(min=0.0, max=1.0)
                 ),
-                vol.Required(CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS): vol.Coerce(int),
+                vol.Required(CONF_MAX_TOKENS, default=DEFAULT_MAX_TOKENS): vol.Coerce(
+                    int
+                ),
             }
 
             # Add Ollama-specific fields in correct position (after Max Tokens)
             if server_type == SERVER_TYPE_OLLAMA:
-                advanced_schema_dict[vol.Optional(CONF_OLLAMA_NUM_CTX, default=DEFAULT_OLLAMA_NUM_CTX)] = vol.Coerce(int)
-                advanced_schema_dict[vol.Optional(CONF_OLLAMA_KEEP_ALIVE, default=DEFAULT_OLLAMA_KEEP_ALIVE)] = str
+                advanced_schema_dict[
+                    vol.Optional(CONF_OLLAMA_NUM_CTX, default=DEFAULT_OLLAMA_NUM_CTX)
+                ] = vol.Coerce(int)
+                advanced_schema_dict[
+                    vol.Optional(
+                        CONF_OLLAMA_KEEP_ALIVE, default=DEFAULT_OLLAMA_KEEP_ALIVE
+                    )
+                ] = str
 
             # Continue with remaining fields
-            advanced_schema_dict.update({
-                vol.Required(CONF_MAX_HISTORY, default=DEFAULT_MAX_HISTORY): vol.Coerce(int),
-                vol.Required(CONF_CONTROL_HA, default=DEFAULT_CONTROL_HA): bool,
-                vol.Required(CONF_MAX_ITERATIONS, default=DEFAULT_MAX_ITERATIONS): vol.Coerce(int),
-                vol.Required(CONF_RESPONSE_MODE, default=DEFAULT_RESPONSE_MODE): SelectSelector(
-                    SelectSelectorConfig(
-                        options=[
-                            {"value": "none", "label": "None"},
-                            {"value": "default", "label": "Smart"},
-                            {"value": "always", "label": "Always"},
-                        ],
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                vol.Optional(
-                    CONF_FOLLOW_UP_PHRASES,
-                    default=get_follow_up_phrases(self.hass.config.language)
-                ): TextSelector(
-                    TextSelectorConfig(multiline=True)
-                ),
-                vol.Optional(
-                    CONF_END_WORDS,
-                    default=get_end_words(self.hass.config.language)
-                ): TextSelector(
-                    TextSelectorConfig(multiline=True)
-                ),
-                vol.Optional(CONF_CLEAN_RESPONSES, default=DEFAULT_CLEAN_RESPONSES): bool,
-                vol.Required(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.All(
-                    vol.Coerce(int), vol.Range(min=5, max=300)
-                ),
-                vol.Required(CONF_DEBUG_MODE, default=DEFAULT_DEBUG_MODE): bool,
-            })
+            advanced_schema_dict.update(
+                {
+                    vol.Required(
+                        CONF_MAX_HISTORY, default=DEFAULT_MAX_HISTORY
+                    ): vol.Coerce(int),
+                    vol.Required(CONF_CONTROL_HA, default=DEFAULT_CONTROL_HA): bool,
+                    vol.Required(
+                        CONF_MAX_ITERATIONS, default=DEFAULT_MAX_ITERATIONS
+                    ): vol.Coerce(int),
+                    vol.Required(
+                        CONF_RESPONSE_MODE, default=DEFAULT_RESPONSE_MODE
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                {"value": "none", "label": "None"},
+                                {"value": "default", "label": "Smart"},
+                                {"value": "always", "label": "Always"},
+                            ],
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_FOLLOW_UP_PHRASES,
+                        default=get_follow_up_phrases(self.hass.config.language),
+                    ): TextSelector(TextSelectorConfig(multiline=True)),
+                    vol.Optional(
+                        CONF_END_WORDS, default=get_end_words(self.hass.config.language)
+                    ): TextSelector(TextSelectorConfig(multiline=True)),
+                    vol.Optional(
+                        CONF_CLEAN_RESPONSES, default=DEFAULT_CLEAN_RESPONSES
+                    ): bool,
+                    vol.Required(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): vol.All(
+                        vol.Coerce(int), vol.Range(min=5, max=300)
+                    ),
+                    vol.Required(CONF_DEBUG_MODE, default=DEFAULT_DEBUG_MODE): bool,
+                }
+            )
 
         advanced_schema = vol.Schema(advanced_schema_dict)
 
         # Set description based on server type
-        if server_type == SERVER_TYPE_CLAWDBOT:
+        if server_type == SERVER_TYPE_MOLTBOT:
             description_placeholders = {
-                "advanced_info": "Clawdbot manages temperature, token limits, history, and tool iterations internally. Only essential settings are shown."
+                "advanced_info": "Moltbot manages temperature, token limits, history, and tool iterations internally. Only essential settings are shown."
             }
         else:
             description_placeholders = {
@@ -746,23 +838,25 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 # Create/update system entry with shared settings
                 from . import get_system_entry
+
                 system_entry = get_system_entry(self.hass)
 
                 if not system_entry:
                     # Create system entry with shared settings
                     await self.hass.config_entries.flow.async_init(
-                        DOMAIN,
-                        context={"source": "system"},
-                        data=user_input
+                        DOMAIN, context={"source": "system"}, data=user_input
                     )
-                    _LOGGER.info("Created system entry with shared MCP settings from initial setup")
+                    _LOGGER.info(
+                        "Created system entry with shared MCP settings from initial setup"
+                    )
                 else:
                     # Update existing system entry
                     self.hass.config_entries.async_update_entry(
-                        system_entry,
-                        data={**system_entry.data, **user_input}
+                        system_entry, data={**system_entry.data, **user_input}
                     )
-                    _LOGGER.info("Updated existing system entry with shared MCP settings")
+                    _LOGGER.info(
+                        "Updated existing system entry with shared MCP settings"
+                    )
 
                 # Combine data from steps 1-4 (profile settings only, no shared settings)
                 combined_data = {
@@ -784,11 +878,14 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     SERVER_TYPE_GEMINI: "Gemini",
                     SERVER_TYPE_ANTHROPIC: "Claude",
                     SERVER_TYPE_OPENROUTER: "OpenRouter",
-                    SERVER_TYPE_CLAWDBOT: "Clawdbot",
+                    SERVER_TYPE_MOLTBOT: "Moltbot",
+                    SERVER_TYPE_VLLM: "vLLM",
                 }
                 server_display = server_display_map.get(server_type, "LM Studio")
 
-                unique_id = f"{DOMAIN}_{server_type}_{profile_name.lower().replace(' ', '_')}"
+                unique_id = (
+                    f"{DOMAIN}_{server_type}_{profile_name.lower().replace(' ', '_')}"
+                )
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
 
@@ -798,24 +895,33 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
 
         # Build schema for MCP server settings
-        mcp_schema = vol.Schema({
-            vol.Required(CONF_MCP_PORT, default=DEFAULT_MCP_PORT): vol.Coerce(int),
-            vol.Required(CONF_SEARCH_PROVIDER, default=DEFAULT_SEARCH_PROVIDER): SelectSelector(
-                SelectSelectorConfig(
-                    options=[
-                        {"value": "none", "label": "Disabled"},
-                        {"value": "duckduckgo", "label": "DuckDuckGo"},
-                        {"value": "brave", "label": "Brave Search (requires API key)"},
-                    ],
-                    mode=SelectSelectorMode.DROPDOWN,
-                )
-            ),
-            vol.Optional(CONF_BRAVE_API_KEY, default=DEFAULT_BRAVE_API_KEY): TextSelector(
-                TextSelectorConfig(type=TextSelectorType.PASSWORD)
-            ),
-            vol.Optional(CONF_ALLOWED_IPS, default=DEFAULT_ALLOWED_IPS): str,
-            vol.Optional(CONF_ENABLE_GAP_FILLING, default=DEFAULT_ENABLE_GAP_FILLING): bool,
-        })
+        mcp_schema = vol.Schema(
+            {
+                vol.Required(CONF_MCP_PORT, default=DEFAULT_MCP_PORT): vol.Coerce(int),
+                vol.Required(
+                    CONF_SEARCH_PROVIDER, default=DEFAULT_SEARCH_PROVIDER
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            {"value": "none", "label": "Disabled"},
+                            {"value": "duckduckgo", "label": "DuckDuckGo"},
+                            {
+                                "value": "brave",
+                                "label": "Brave Search (requires API key)",
+                            },
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(
+                    CONF_BRAVE_API_KEY, default=DEFAULT_BRAVE_API_KEY
+                ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+                vol.Optional(CONF_ALLOWED_IPS, default=DEFAULT_ALLOWED_IPS): str,
+                vol.Optional(
+                    CONF_ENABLE_GAP_FILLING, default=DEFAULT_ENABLE_GAP_FILLING
+                ): bool,
+            }
+        )
 
         return self.async_show_form(
             step_id="mcp_server",
@@ -823,7 +929,7 @@ class MCPAssistConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={
                 "info": "⚠️ These settings will be shared across ALL profiles. Restart Home Assistant after making changes."
-            }
+            },
         )
 
     async def async_step_system(self, data: dict[str, Any]) -> FlowResult:
@@ -861,7 +967,9 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
             return provider
 
         # Backward compat: if old enable_custom_tools was True, default to "brave"
-        if options.get(CONF_ENABLE_CUSTOM_TOOLS, data.get(CONF_ENABLE_CUSTOM_TOOLS, False)):
+        if options.get(
+            CONF_ENABLE_CUSTOM_TOOLS, data.get(CONF_ENABLE_CUSTOM_TOOLS, False)
+        ):
             return "brave"
 
         return DEFAULT_SEARCH_PROVIDER
@@ -877,17 +985,22 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             if not errors:
                 # Support both old and new config keys
-                if CONF_FOLLOW_UP_MODE in user_input and CONF_RESPONSE_MODE not in user_input:
+                if (
+                    CONF_FOLLOW_UP_MODE in user_input
+                    and CONF_RESPONSE_MODE not in user_input
+                ):
                     user_input[CONF_RESPONSE_MODE] = user_input[CONF_FOLLOW_UP_MODE]
                     del user_input[CONF_FOLLOW_UP_MODE]
 
-                # For Clawdbot, ensure model name and empty system prompt are set
-                server_type = self.config_entry.data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
-                if server_type == SERVER_TYPE_CLAWDBOT:
+                # For Moltbot, ensure model name and empty system prompt are set
+                server_type = self.config_entry.data.get(
+                    CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE
+                )
+                if server_type == SERVER_TYPE_MOLTBOT:
                     if CONF_MODEL_NAME not in user_input:
                         user_input[CONF_MODEL_NAME] = "main"
                     if CONF_SYSTEM_PROMPT not in user_input:
-                        user_input[CONF_SYSTEM_PROMPT] = ""  # Clawdbot manages its own
+                        user_input[CONF_SYSTEM_PROMPT] = ""  # Moltbot manages its own
 
                 # Store profile settings and proceed to MCP server settings
                 self.profile_options = user_input
@@ -901,22 +1014,33 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
         server_type = data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
 
         # Handle backward compatibility
-        response_mode_value = options.get(CONF_RESPONSE_MODE,
-                                         options.get(CONF_FOLLOW_UP_MODE,
-                                         DEFAULT_RESPONSE_MODE))
+        response_mode_value = options.get(
+            CONF_RESPONSE_MODE, options.get(CONF_FOLLOW_UP_MODE, DEFAULT_RESPONSE_MODE)
+        )
 
         # Fetch models based on server type
         models = []
-        current_model = options.get(CONF_MODEL_NAME, data.get(CONF_MODEL_NAME, DEFAULT_MODEL_NAME))
+        current_model = options.get(
+            CONF_MODEL_NAME, data.get(CONF_MODEL_NAME, DEFAULT_MODEL_NAME)
+        )
 
-        # Clawdbot doesn't have /v1/models - skip model fetching
-        if server_type == SERVER_TYPE_CLAWDBOT:
+        # Moltbot doesn't have /v1/models - skip model fetching
+        if server_type == SERVER_TYPE_MOLTBOT:
             # Don't fetch models, don't show model field
             pass
-        elif server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_LLAMACPP, SERVER_TYPE_OLLAMA]:
+        elif server_type in [
+            SERVER_TYPE_LMSTUDIO,
+            SERVER_TYPE_LLAMACPP,
+            SERVER_TYPE_OLLAMA,
+            SERVER_TYPE_VLLM,
+        ]:
             # Local servers - fetch from URL
-            server_url = options.get(CONF_LMSTUDIO_URL, data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL)).rstrip("/")
-            _LOGGER.info(f"🔍 OPTIONS: Attempting to fetch models from {server_type} at {server_url}")
+            server_url = options.get(
+                CONF_LMSTUDIO_URL, data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL)
+            ).rstrip("/")
+            _LOGGER.info(
+                f"🔍 OPTIONS: Attempting to fetch models from {server_type} at {server_url}"
+            )
             try:
                 models = await fetch_models_from_lmstudio(self.hass, server_url)
                 _LOGGER.info(f"✅ OPTIONS: Successfully fetched {len(models)} models")
@@ -929,7 +1053,9 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                 _LOGGER.info("🔍 OPTIONS: Attempting to fetch models from OpenAI")
                 try:
                     models = await fetch_models_from_openai(self.hass, api_key)
-                    _LOGGER.info(f"✅ OPTIONS: Successfully fetched {len(models)} OpenAI models")
+                    _LOGGER.info(
+                        f"✅ OPTIONS: Successfully fetched {len(models)} OpenAI models"
+                    )
                 except Exception as err:
                     _LOGGER.error(f"❌ OPTIONS: Failed to fetch OpenAI models: {err}")
         elif server_type == SERVER_TYPE_GEMINI:
@@ -939,7 +1065,9 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                 _LOGGER.info("🔍 OPTIONS: Attempting to fetch models from Gemini")
                 try:
                     models = await fetch_models_from_gemini(self.hass, api_key)
-                    _LOGGER.info(f"✅ OPTIONS: Successfully fetched {len(models)} Gemini models")
+                    _LOGGER.info(
+                        f"✅ OPTIONS: Successfully fetched {len(models)} Gemini models"
+                    )
                 except Exception as err:
                     _LOGGER.error(f"❌ OPTIONS: Failed to fetch Gemini models: {err}")
         elif server_type == SERVER_TYPE_OPENROUTER:
@@ -949,9 +1077,13 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                 _LOGGER.info("🔍 OPTIONS: Attempting to fetch models from OpenRouter")
                 try:
                     models = await fetch_models_from_openrouter(self.hass, api_key)
-                    _LOGGER.info(f"✅ OPTIONS: Successfully fetched {len(models)} OpenRouter models")
+                    _LOGGER.info(
+                        f"✅ OPTIONS: Successfully fetched {len(models)} OpenRouter models"
+                    )
                 except Exception as err:
-                    _LOGGER.error(f"❌ OPTIONS: Failed to fetch OpenRouter models: {err}")
+                    _LOGGER.error(
+                        f"❌ OPTIONS: Failed to fetch OpenRouter models: {err}"
+                    )
 
         # Build model selector based on whether models were fetched
         if models:
@@ -972,17 +1104,26 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
             # 1. Profile Name
             vol.Required(
                 CONF_PROFILE_NAME,
-                default=options.get(CONF_PROFILE_NAME, data.get(CONF_PROFILE_NAME, "Default"))
+                default=options.get(
+                    CONF_PROFILE_NAME, data.get(CONF_PROFILE_NAME, "Default")
+                ),
             ): str,
         }
 
         # 2. Server URL or API Key (based on server type)
-        if server_type in [SERVER_TYPE_LMSTUDIO, SERVER_TYPE_OLLAMA, SERVER_TYPE_CLAWDBOT]:
-            server_url = options.get(CONF_LMSTUDIO_URL, data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL))
+        if server_type in [
+            SERVER_TYPE_LMSTUDIO,
+            SERVER_TYPE_OLLAMA,
+            SERVER_TYPE_MOLTBOT,
+            SERVER_TYPE_VLLM,
+        ]:
+            server_url = options.get(
+                CONF_LMSTUDIO_URL, data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL)
+            )
             schema_dict[vol.Required(CONF_LMSTUDIO_URL, default=server_url)] = str
 
-            # Clawdbot also needs bearer token
-            if server_type == SERVER_TYPE_CLAWDBOT:
+            # Moltbot also needs bearer token (required)
+            if server_type == SERVER_TYPE_MOLTBOT:
                 api_key = options.get(CONF_API_KEY, data.get(CONF_API_KEY, ""))
                 schema_dict[vol.Required(CONF_API_KEY, default=api_key)] = TextSelector(
                     TextSelectorConfig(type=TextSelectorType.PASSWORD)
@@ -994,150 +1135,201 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                 TextSelectorConfig(type=TextSelectorType.PASSWORD)
             )
 
-        # 3. Model Name (skip for Clawdbot - hardcoded to "main")
-        if server_type != SERVER_TYPE_CLAWDBOT:
-            schema_dict[vol.Required(CONF_MODEL_NAME, default=current_model)] = model_selector
+        # 3. Model Name (skip for Moltbot - hardcoded to "main")
+        if server_type != SERVER_TYPE_MOLTBOT:
+            schema_dict[
+                vol.Required(CONF_MODEL_NAME, default=current_model)
+            ] = model_selector
 
         # Continue with remaining common fields
-        # 4. System Prompt (skip for Clawdbot - it manages its own)
-        if server_type != SERVER_TYPE_CLAWDBOT:
-            schema_dict[vol.Required(
-                CONF_SYSTEM_PROMPT,
-                default=options.get(CONF_SYSTEM_PROMPT, data.get(CONF_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT))
-            )] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True))
+        # 4. System Prompt (skip for Moltbot - it manages its own)
+        if server_type != SERVER_TYPE_MOLTBOT:
+            schema_dict[
+                vol.Required(
+                    CONF_SYSTEM_PROMPT,
+                    default=options.get(
+                        CONF_SYSTEM_PROMPT,
+                        data.get(CONF_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT),
+                    ),
+                )
+            ] = TextSelector(
+                TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True)
+            )
 
         # 5. Technical Instructions
-        schema_dict[vol.Required(
-            CONF_TECHNICAL_PROMPT,
-            default=options.get(CONF_TECHNICAL_PROMPT, data.get(CONF_TECHNICAL_PROMPT, DEFAULT_TECHNICAL_PROMPT))
-        )] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True))
+        schema_dict[
+            vol.Required(
+                CONF_TECHNICAL_PROMPT,
+                default=options.get(
+                    CONF_TECHNICAL_PROMPT,
+                    data.get(CONF_TECHNICAL_PROMPT, DEFAULT_TECHNICAL_PROMPT),
+                ),
+            )
+        ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT, multiline=True))
 
-        # For Clawdbot, only show Control HA, Timeout, Clean Responses, and Debug Mode
-        if server_type == SERVER_TYPE_CLAWDBOT:
-            schema_dict.update({
-                vol.Required(
-                    CONF_CONTROL_HA,
-                    default=options.get(CONF_CONTROL_HA, data.get(CONF_CONTROL_HA, DEFAULT_CONTROL_HA))
-                ): bool,
-                vol.Optional(
-                    CONF_CLEAN_RESPONSES,
-                    default=options.get(CONF_CLEAN_RESPONSES, data.get(CONF_CLEAN_RESPONSES, DEFAULT_CLEAN_RESPONSES))
-                ): bool,
-                vol.Required(
-                    CONF_TIMEOUT,
-                    default=options.get(CONF_TIMEOUT, data.get(CONF_TIMEOUT, 60))
-                ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
-                vol.Required(
-                    CONF_DEBUG_MODE,
-                    default=options.get(CONF_DEBUG_MODE, data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE))
-                ): bool,
-            })
+        # For Moltbot, only show Control HA, Timeout, Clean Responses, and Debug Mode
+        if server_type == SERVER_TYPE_MOLTBOT:
+            schema_dict.update(
+                {
+                    vol.Required(
+                        CONF_CONTROL_HA,
+                        default=options.get(
+                            CONF_CONTROL_HA,
+                            data.get(CONF_CONTROL_HA, DEFAULT_CONTROL_HA),
+                        ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_CLEAN_RESPONSES,
+                        default=options.get(
+                            CONF_CLEAN_RESPONSES,
+                            data.get(CONF_CLEAN_RESPONSES, DEFAULT_CLEAN_RESPONSES),
+                        ),
+                    ): bool,
+                    vol.Required(
+                        CONF_TIMEOUT,
+                        default=options.get(CONF_TIMEOUT, data.get(CONF_TIMEOUT, 60)),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
+                    vol.Required(
+                        CONF_DEBUG_MODE,
+                        default=options.get(
+                            CONF_DEBUG_MODE,
+                            data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE),
+                        ),
+                    ): bool,
+                }
+            )
         else:
             # Other servers - show all fields
-            schema_dict.update({
-                # 6. Temperature
-                vol.Required(
-                    CONF_TEMPERATURE,
-                    default=options.get(CONF_TEMPERATURE, data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE))
-                ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
-
-                # 7. Max Response Tokens
-                vol.Required(
-                    CONF_MAX_TOKENS,
-                    default=options.get(CONF_MAX_TOKENS, data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS))
-                ): vol.Coerce(int),
-            })
+            schema_dict.update(
+                {
+                    # 6. Temperature
+                    vol.Required(
+                        CONF_TEMPERATURE,
+                        default=options.get(
+                            CONF_TEMPERATURE,
+                            data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
+                        ),
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+                    # 7. Max Response Tokens
+                    vol.Required(
+                        CONF_MAX_TOKENS,
+                        default=options.get(
+                            CONF_MAX_TOKENS,
+                            data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS),
+                        ),
+                    ): vol.Coerce(int),
+                }
+            )
 
             # Add Ollama-specific fields in correct position (after Max Tokens)
             if server_type == SERVER_TYPE_OLLAMA:
-                schema_dict[vol.Optional(
-                    CONF_OLLAMA_NUM_CTX,
-                    default=options.get(
+                schema_dict[
+                    vol.Optional(
                         CONF_OLLAMA_NUM_CTX,
-                        data.get(CONF_OLLAMA_NUM_CTX, DEFAULT_OLLAMA_NUM_CTX)
+                        default=options.get(
+                            CONF_OLLAMA_NUM_CTX,
+                            data.get(CONF_OLLAMA_NUM_CTX, DEFAULT_OLLAMA_NUM_CTX),
+                        ),
                     )
-                )] = vol.Coerce(int)
-                schema_dict[vol.Optional(
-                    CONF_OLLAMA_KEEP_ALIVE,
-                    default=options.get(
+                ] = vol.Coerce(int)
+                schema_dict[
+                    vol.Optional(
                         CONF_OLLAMA_KEEP_ALIVE,
-                        data.get(CONF_OLLAMA_KEEP_ALIVE, DEFAULT_OLLAMA_KEEP_ALIVE)
+                        default=options.get(
+                            CONF_OLLAMA_KEEP_ALIVE,
+                            data.get(CONF_OLLAMA_KEEP_ALIVE, DEFAULT_OLLAMA_KEEP_ALIVE),
+                        ),
                     )
-                )] = str
+                ] = str
 
             # Continue with remaining fields
-            schema_dict.update({
-                # 8/10. Max History Messages
-                vol.Required(
-                    CONF_MAX_HISTORY,
-                    default=options.get(CONF_MAX_HISTORY, data.get(CONF_MAX_HISTORY, DEFAULT_MAX_HISTORY))
-                ): vol.Coerce(int),
-
-                # 9/11. Control Home Assistant
-                vol.Required(
-                    CONF_CONTROL_HA,
-                    default=options.get(CONF_CONTROL_HA, data.get(CONF_CONTROL_HA, DEFAULT_CONTROL_HA))
-                ): bool,
-
-                # 10/12. Max Tool Iterations
-                vol.Required(
-                    CONF_MAX_ITERATIONS,
-                    default=options.get(CONF_MAX_ITERATIONS, data.get(CONF_MAX_ITERATIONS, DEFAULT_MAX_ITERATIONS))
-                ): vol.Coerce(int),
-
-                # 11/13. Response Mode
-                vol.Required(
-                    CONF_RESPONSE_MODE,
-                    default=response_mode_value
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        options=[
-                            {"value": "none", "label": "None"},
-                            {"value": "default", "label": "Smart"},
-                            {"value": "always", "label": "Always"},
-                        ],
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-
-                # 12/14. Follow-up Phrases
-                vol.Optional(
-                    CONF_FOLLOW_UP_PHRASES,
-                    default=options.get(CONF_FOLLOW_UP_PHRASES, data.get(CONF_FOLLOW_UP_PHRASES, DEFAULT_FOLLOW_UP_PHRASES))
-                ): TextSelector(TextSelectorConfig(multiline=True)),
-
-                # 13/15. End Conversation Words
-                vol.Optional(
-                    CONF_END_WORDS,
-                    default=options.get(CONF_END_WORDS, data.get(CONF_END_WORDS, DEFAULT_END_WORDS))
-                ): TextSelector(TextSelectorConfig(multiline=True)),
-
-                # 14/16. Clean Responses
-                vol.Required(
-                    CONF_CLEAN_RESPONSES,
-                    default=options.get(CONF_CLEAN_RESPONSES, data.get(CONF_CLEAN_RESPONSES, DEFAULT_CLEAN_RESPONSES))
-                ): bool,
-
-                # 15/17. Response Time Out
-                vol.Required(
-                    CONF_TIMEOUT,
-                    default=options.get(CONF_TIMEOUT, data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
-                ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
-
-                # 16/18. Debug Mode
-                vol.Required(
-                    CONF_DEBUG_MODE,
-                    default=options.get(CONF_DEBUG_MODE, data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE))
-                ): bool,
-            })
+            schema_dict.update(
+                {
+                    # 8/10. Max History Messages
+                    vol.Required(
+                        CONF_MAX_HISTORY,
+                        default=options.get(
+                            CONF_MAX_HISTORY,
+                            data.get(CONF_MAX_HISTORY, DEFAULT_MAX_HISTORY),
+                        ),
+                    ): vol.Coerce(int),
+                    # 9/11. Control Home Assistant
+                    vol.Required(
+                        CONF_CONTROL_HA,
+                        default=options.get(
+                            CONF_CONTROL_HA,
+                            data.get(CONF_CONTROL_HA, DEFAULT_CONTROL_HA),
+                        ),
+                    ): bool,
+                    # 10/12. Max Tool Iterations
+                    vol.Required(
+                        CONF_MAX_ITERATIONS,
+                        default=options.get(
+                            CONF_MAX_ITERATIONS,
+                            data.get(CONF_MAX_ITERATIONS, DEFAULT_MAX_ITERATIONS),
+                        ),
+                    ): vol.Coerce(int),
+                    # 11/13. Response Mode
+                    vol.Required(
+                        CONF_RESPONSE_MODE, default=response_mode_value
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                {"value": "none", "label": "None"},
+                                {"value": "default", "label": "Smart"},
+                                {"value": "always", "label": "Always"},
+                            ],
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    # 12/14. Follow-up Phrases
+                    vol.Optional(
+                        CONF_FOLLOW_UP_PHRASES,
+                        default=options.get(
+                            CONF_FOLLOW_UP_PHRASES,
+                            data.get(CONF_FOLLOW_UP_PHRASES, DEFAULT_FOLLOW_UP_PHRASES),
+                        ),
+                    ): TextSelector(TextSelectorConfig(multiline=True)),
+                    # 13/15. End Conversation Words
+                    vol.Optional(
+                        CONF_END_WORDS,
+                        default=options.get(
+                            CONF_END_WORDS, data.get(CONF_END_WORDS, DEFAULT_END_WORDS)
+                        ),
+                    ): TextSelector(TextSelectorConfig(multiline=True)),
+                    # 14/16. Clean Responses
+                    vol.Required(
+                        CONF_CLEAN_RESPONSES,
+                        default=options.get(
+                            CONF_CLEAN_RESPONSES,
+                            data.get(CONF_CLEAN_RESPONSES, DEFAULT_CLEAN_RESPONSES),
+                        ),
+                    ): bool,
+                    # 15/17. Response Time Out
+                    vol.Required(
+                        CONF_TIMEOUT,
+                        default=options.get(
+                            CONF_TIMEOUT, data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
+                    # 16/18. Debug Mode
+                    vol.Required(
+                        CONF_DEBUG_MODE,
+                        default=options.get(
+                            CONF_DEBUG_MODE,
+                            data.get(CONF_DEBUG_MODE, DEFAULT_DEBUG_MODE),
+                        ),
+                    ): bool,
+                }
+            )
 
         # Create the schema from the built dictionary
         options_schema = vol.Schema(schema_dict)
 
         # Set description based on server type
-        if server_type == SERVER_TYPE_CLAWDBOT:
+        if server_type == SERVER_TYPE_MOLTBOT:
             description_placeholders = {
-                "server_info": "Clawdbot's model and system prompt are configured on the Clawdbot server. Use the technical instructions below to configure how it uses MCP tools to control Home Assistant."
+                "server_info": "Moltbot's model and system prompt are configured on the Moltbot server. Use the technical instructions below to configure how it uses MCP tools to control Home Assistant."
             }
         else:
             description_placeholders = {
@@ -1171,8 +1363,7 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                 system_entry = get_system_entry(self.hass)
                 if system_entry:
                     self.hass.config_entries.async_update_entry(
-                        system_entry,
-                        data={**system_entry.data, **user_input}
+                        system_entry, data={**system_entry.data, **user_input}
                     )
                     _LOGGER.info("Updated system entry with shared MCP settings")
                 else:
@@ -1181,10 +1372,13 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                 # Update profile entry with per-profile settings only
                 # Update entry title if profile name changed
                 new_profile_name = self.profile_options.get(CONF_PROFILE_NAME)
-                old_profile_name = self.config_entry.options.get(CONF_PROFILE_NAME,
-                                                                  self.config_entry.data.get(CONF_PROFILE_NAME))
+                old_profile_name = self.config_entry.options.get(
+                    CONF_PROFILE_NAME, self.config_entry.data.get(CONF_PROFILE_NAME)
+                )
                 if new_profile_name and new_profile_name != old_profile_name:
-                    server_type = self.config_entry.data.get(CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE)
+                    server_type = self.config_entry.data.get(
+                        CONF_SERVER_TYPE, DEFAULT_SERVER_TYPE
+                    )
                     server_display_map = {
                         SERVER_TYPE_LMSTUDIO: "LM Studio",
                         SERVER_TYPE_LLAMACPP: "llama.cpp",
@@ -1193,12 +1387,13 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
                         SERVER_TYPE_GEMINI: "Gemini",
                         SERVER_TYPE_ANTHROPIC: "Claude",
                         SERVER_TYPE_OPENROUTER: "OpenRouter",
-                        SERVER_TYPE_CLAWDBOT: "Clawdbot",
+                        SERVER_TYPE_MOLTBOT: "Moltbot",
+                        SERVER_TYPE_VLLM: "vLLM",
                     }
                     server_display = server_display_map.get(server_type, "LM Studio")
                     self.hass.config_entries.async_update_entry(
                         self.config_entry,
-                        title=f"{server_display} - {new_profile_name}"
+                        title=f"{server_display} - {new_profile_name}",
                     )
 
                 # Save profile settings only (not shared settings)
@@ -1206,6 +1401,7 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
 
         # Get current values from system entry
         from . import get_system_entry
+
         system_entry = get_system_entry(self.hass)
 
         # Get shared settings from system entry (with fallback to profile for backward compat)
@@ -1218,41 +1414,55 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
             sys_data = self.config_entry.data
 
         # Build schema for MCP server settings
-        mcp_schema = vol.Schema({
-            vol.Required(
-                CONF_MCP_PORT,
-                default=sys_options.get(CONF_MCP_PORT, sys_data.get(CONF_MCP_PORT, DEFAULT_MCP_PORT))
-            ): vol.Coerce(int),
-
-            vol.Required(
-                CONF_SEARCH_PROVIDER,
-                default=self._get_search_provider_default(sys_options, sys_data)
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=[
-                        {"value": "none", "label": "Disabled"},
-                        {"value": "duckduckgo", "label": "DuckDuckGo"},
-                        {"value": "brave", "label": "Brave Search (requires API key)"},
-                    ],
-                    mode=SelectSelectorMode.DROPDOWN,
-                )
-            ),
-
-            vol.Optional(
-                CONF_BRAVE_API_KEY,
-                default=sys_options.get(CONF_BRAVE_API_KEY, sys_data.get(CONF_BRAVE_API_KEY, DEFAULT_BRAVE_API_KEY))
-            ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
-
-            vol.Optional(
-                CONF_ALLOWED_IPS,
-                default=sys_options.get(CONF_ALLOWED_IPS, sys_data.get(CONF_ALLOWED_IPS, DEFAULT_ALLOWED_IPS))
-            ): str,
-
-            vol.Optional(
-                CONF_ENABLE_GAP_FILLING,
-                default=sys_options.get(CONF_ENABLE_GAP_FILLING, sys_data.get(CONF_ENABLE_GAP_FILLING, DEFAULT_ENABLE_GAP_FILLING))
-            ): bool,
-        })
+        mcp_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_MCP_PORT,
+                    default=sys_options.get(
+                        CONF_MCP_PORT, sys_data.get(CONF_MCP_PORT, DEFAULT_MCP_PORT)
+                    ),
+                ): vol.Coerce(int),
+                vol.Required(
+                    CONF_SEARCH_PROVIDER,
+                    default=self._get_search_provider_default(sys_options, sys_data),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            {"value": "none", "label": "Disabled"},
+                            {"value": "duckduckgo", "label": "DuckDuckGo"},
+                            {
+                                "value": "brave",
+                                "label": "Brave Search (requires API key)",
+                            },
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(
+                    CONF_BRAVE_API_KEY,
+                    default=sys_options.get(
+                        CONF_BRAVE_API_KEY,
+                        sys_data.get(CONF_BRAVE_API_KEY, DEFAULT_BRAVE_API_KEY),
+                    ),
+                ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+                vol.Optional(
+                    CONF_ALLOWED_IPS,
+                    default=sys_options.get(
+                        CONF_ALLOWED_IPS,
+                        sys_data.get(CONF_ALLOWED_IPS, DEFAULT_ALLOWED_IPS),
+                    ),
+                ): str,
+                vol.Optional(
+                    CONF_ENABLE_GAP_FILLING,
+                    default=sys_options.get(
+                        CONF_ENABLE_GAP_FILLING,
+                        sys_data.get(
+                            CONF_ENABLE_GAP_FILLING, DEFAULT_ENABLE_GAP_FILLING
+                        ),
+                    ),
+                ): bool,
+            }
+        )
 
         return self.async_show_form(
             step_id="mcp_server",
@@ -1260,7 +1470,7 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
             errors=errors,
             description_placeholders={
                 "warning": "⚠️ These settings are shared across ALL MCP Assist profiles. Restart Home Assistant after making changes."
-            }
+            },
         )
 
 
