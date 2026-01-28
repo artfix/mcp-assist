@@ -1113,6 +1113,7 @@ class MCPAssistOptionsFlow(config_entries.OptionsFlow):
         # 2. Server URL or API Key (based on server type)
         if server_type in [
             SERVER_TYPE_LMSTUDIO,
+            SERVER_TYPE_LLAMACPP,
             SERVER_TYPE_OLLAMA,
             SERVER_TYPE_MOLTBOT,
             SERVER_TYPE_VLLM,
