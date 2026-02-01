@@ -6,6 +6,7 @@ import json
 import logging
 from typing import Any, Dict, List
 from urllib.parse import urlparse
+from datetime import timedelta
 
 from aiohttp import web, WSMsgType
 from aiohttp.web_ws import WebSocketResponse
@@ -13,6 +14,7 @@ from aiohttp.web_ws import WebSocketResponse
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.components.homeassistant import async_should_expose
+from homeassistant.components.recorder import history
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -34,7 +36,7 @@ from .domain_registry import (
     get_domains_by_type,
     TYPE_CONTROLLABLE,
     TYPE_READ_ONLY,
-    TYPE_SERVICE_ONLY
+    TYPE_SERVICE_ONLY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,29 +64,41 @@ class MCPServer:
         lmstudio_url = DEFAULT_LMSTUDIO_URL
         if entry:
             # Check options first, then data
-            lmstudio_url = entry.options.get(CONF_LMSTUDIO_URL,
-                                            entry.data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL))
+            lmstudio_url = entry.options.get(
+                CONF_LMSTUDIO_URL,
+                entry.data.get(CONF_LMSTUDIO_URL, DEFAULT_LMSTUDIO_URL),
+            )
 
         # Extract hostname/IP from LM Studio URL
         try:
             parsed = urlparse(lmstudio_url)
-            lmstudio_host = parsed.hostname or parsed.netloc.split(':')[0]
+            lmstudio_host = parsed.hostname or parsed.netloc.split(":")[0]
             if lmstudio_host and lmstudio_host not in self.allowed_ips:
                 self.allowed_ips.append(lmstudio_host)
-                _LOGGER.info("MCP server automatically whitelisted LM Studio IP: %s", lmstudio_host)
+                _LOGGER.info(
+                    "MCP server automatically whitelisted LM Studio IP: %s",
+                    lmstudio_host,
+                )
         except Exception as e:
             _LOGGER.warning("Could not parse LM Studio URL '%s': %s", lmstudio_url, e)
 
         # Add user-configured allowed IPs/CIDR ranges (shared setting)
-        allowed_ips_str = self._get_shared_setting(CONF_ALLOWED_IPS, DEFAULT_ALLOWED_IPS)
+        allowed_ips_str = self._get_shared_setting(
+            CONF_ALLOWED_IPS, DEFAULT_ALLOWED_IPS
+        )
         if allowed_ips_str:
             # Parse comma-separated list
-            additional_ips = [ip.strip() for ip in allowed_ips_str.split(',') if ip.strip()]
+            additional_ips = [
+                ip.strip() for ip in allowed_ips_str.split(",") if ip.strip()
+            ]
             for ip_entry in additional_ips:
                 if ip_entry not in self.allowed_ips:
                     self.allowed_ips.append(ip_entry)
             if additional_ips:
-                _LOGGER.info("MCP server added user-configured allowed IPs/ranges: %s", additional_ips)
+                _LOGGER.info(
+                    "MCP server added user-configured allowed IPs/ranges: %s",
+                    additional_ips,
+                )
 
         _LOGGER.info("MCP server allowed IPs/ranges: %s", self.allowed_ips)
 
@@ -127,7 +141,10 @@ class MCPServer:
     async def start(self) -> None:
         """Start the MCP server."""
         try:
-            _LOGGER.info("Starting MCP server on port %d, binding to all interfaces (0.0.0.0)", self.port)
+            _LOGGER.info(
+                "Starting MCP server on port %d, binding to all interfaces (0.0.0.0)",
+                self.port,
+            )
 
             # Create web application (IP checks are done per-handler, not via middleware)
             self.app = web.Application()
@@ -136,7 +153,9 @@ class MCPServer:
             self.app.router.add_get("/", self.handle_sse)  # Also handle root GET as SSE
             self.app.router.add_get("/ws", self.handle_websocket)
             self.app.router.add_get("/health", self.handle_health)
-            self.app.router.add_get("/progress", self.handle_progress_stream)  # Progress streaming
+            self.app.router.add_get(
+                "/progress", self.handle_progress_stream
+            )  # Progress streaming
 
             self.runner = web.AppRunner(self.app)
             await self.runner.setup()
@@ -151,27 +170,43 @@ class MCPServer:
             if search_provider in ["brave", "duckduckgo"]:
                 try:
                     from .custom_tools import CustomToolsLoader
+
                     self.custom_tools = CustomToolsLoader(self.hass, self.entry)
                     await self.custom_tools.initialize()
-                    _LOGGER.info("✅ Custom tools initialized for search provider: %s", search_provider)
+                    _LOGGER.info(
+                        "✅ Custom tools initialized for search provider: %s",
+                        search_provider,
+                    )
                 except Exception as e:
                     _LOGGER.error(f"Failed to initialize custom tools: {e}")
 
-            _LOGGER.info("✅ MCP server started successfully on http://0.0.0.0:%d", self.port)
+            _LOGGER.info(
+                "✅ MCP server started successfully on http://0.0.0.0:%d", self.port
+            )
             _LOGGER.info("🌐 MCP server is accessible from external machines")
-            _LOGGER.info("🔗 Health check available at: http://<your-ha-ip>:%d/health", self.port)
+            _LOGGER.info(
+                "🔗 Health check available at: http://<your-ha-ip>:%d/health", self.port
+            )
             _LOGGER.info("📡 WebSocket endpoint: ws://<your-ha-ip>:%d/ws", self.port)
             _LOGGER.info("📤 HTTP endpoint: http://<your-ha-ip>:%d/", self.port)
 
         except OSError as err:
             if err.errno == 98:  # Address already in use
-                _LOGGER.error("❌ Port %d is already in use. Please choose a different port.", self.port)
+                _LOGGER.error(
+                    "❌ Port %d is already in use. Please choose a different port.",
+                    self.port,
+                )
                 raise
             elif err.errno == 13:  # Permission denied
-                _LOGGER.error("❌ Permission denied to bind to port %d. Try a port >= 1024.", self.port)
+                _LOGGER.error(
+                    "❌ Permission denied to bind to port %d. Try a port >= 1024.",
+                    self.port,
+                )
                 raise
             else:
-                _LOGGER.error("❌ Failed to bind MCP server to port %d: %s", self.port, err)
+                _LOGGER.error(
+                    "❌ Failed to bind MCP server to port %d: %s", self.port, err
+                )
                 raise
         except Exception as err:
             _LOGGER.error("❌ Failed to start MCP server: %s", err)
@@ -207,14 +242,14 @@ class MCPServer:
         ip_only = client_ip
 
         # Handle IPv6 with port: [2001:db8::1]:8080 -> 2001:db8::1
-        if ip_only.startswith('['):
-            end_bracket = ip_only.find(']')
+        if ip_only.startswith("["):
+            end_bracket = ip_only.find("]")
             if end_bracket > 0:
                 ip_only = ip_only[1:end_bracket]
         # Handle IPv4 with port: 192.168.1.7:12345 -> 192.168.1.7
         # Only split on single colon (not IPv6 which has multiple colons)
-        elif ip_only.count(':') == 1:
-            ip_only = ip_only.split(':')[0]
+        elif ip_only.count(":") == 1:
+            ip_only = ip_only.split(":")[0]
         # Else: IPv6 without port (::1) or IPv4 without port - use as-is
 
         # Convert to IP address object for CIDR checking
@@ -231,14 +266,16 @@ class MCPServer:
                 return True
 
             # Check if it's a CIDR range
-            if '/' in allowed_entry:
+            if "/" in allowed_entry:
                 try:
                     network = ipaddress.ip_network(allowed_entry, strict=False)
                     if client_ip_obj in network:
                         return True
                 except ValueError:
                     # Invalid CIDR format, skip
-                    _LOGGER.warning("Invalid CIDR format in allowed IPs: %s", allowed_entry)
+                    _LOGGER.warning(
+                        "Invalid CIDR format in allowed IPs: %s", allowed_entry
+                    )
                     continue
 
         return False
@@ -256,10 +293,10 @@ class MCPServer:
             "endpoints": {
                 "websocket": f"ws://<host>:{self.port}/ws",
                 "http": f"http://<host>:{self.port}/",
-                "health": f"http://<host>:{self.port}/health"
+                "health": f"http://<host>:{self.port}/health",
             },
             "tools_available": len(await self._get_tools_list()),
-            "timestamp": dt_util.now().isoformat()
+            "timestamp": dt_util.now().isoformat(),
         }
         return web.json_response(health_info)
 
@@ -270,18 +307,20 @@ class MCPServer:
 
         # Check IP whitelist
         if not self._is_ip_allowed(client_ip):
-            _LOGGER.warning("🚫 Blocked progress stream request from unauthorized IP: %s", client_ip)
+            _LOGGER.warning(
+                "🚫 Blocked progress stream request from unauthorized IP: %s", client_ip
+            )
             return web.Response(status=403, text="Forbidden: IP not authorized")
 
         response = web.StreamResponse(
             status=200,
-            reason='OK',
+            reason="OK",
             headers={
-                'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
-                'Access-Control-Allow-Origin': '*',
-            }
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+            },
         )
         await response.prepare(request)
 
@@ -310,11 +349,12 @@ class MCPServer:
     def publish_progress(self, event_type: str, message: str, **kwargs):
         """Publish progress update to all progress SSE clients."""
         import time
+
         msg = {
             "type": event_type,
             "message": message,
             "timestamp": time.time(),
-            **kwargs
+            **kwargs,
         }
 
         # Send to all progress clients
@@ -331,15 +371,17 @@ class MCPServer:
 
         # Check IP whitelist
         if not self._is_ip_allowed(client_ip):
-            _LOGGER.warning("🚫 Blocked SSE connection from unauthorized IP: %s", client_ip)
+            _LOGGER.warning(
+                "🚫 Blocked SSE connection from unauthorized IP: %s", client_ip
+            )
             return web.Response(status=403, text="Forbidden: IP not authorized")
 
         response = web.StreamResponse()
-        response.headers['Content-Type'] = 'text/event-stream'
-        response.headers['Cache-Control'] = 'no-cache'
-        response.headers['Connection'] = 'keep-alive'
-        response.headers['X-Accel-Buffering'] = 'no'  # Disable nginx buffering
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers["Content-Type"] = "text/event-stream"
+        response.headers["Cache-Control"] = "no-cache"
+        response.headers["Connection"] = "keep-alive"
+        response.headers["X-Accel-Buffering"] = "no"  # Disable nginx buffering
+        response.headers["Access-Control-Allow-Origin"] = "*"
 
         await response.prepare(request)
 
@@ -349,12 +391,12 @@ class MCPServer:
 
         try:
             # Send initial connection confirmation
-            await response.write(b': connected\n\n')
+            await response.write(b": connected\n\n")
 
             # Send tools list changed notification immediately
             notification = {
                 "jsonrpc": "2.0",
-                "method": "notifications/tools/list_changed"
+                "method": "notifications/tools/list_changed",
             }
             await response.write(f"data: {json.dumps(notification)}\n\n".encode())
             _LOGGER.info("📤 Sent initial tools/list_changed notification")
@@ -362,7 +404,7 @@ class MCPServer:
             # Keep connection alive
             while True:
                 await asyncio.sleep(30)
-                await response.write(b': keepalive\n\n')
+                await response.write(b": keepalive\n\n")
 
         except Exception as err:
             _LOGGER.info("📤 SSE client disconnected: %s", err)
@@ -385,7 +427,9 @@ class MCPServer:
 
         # Check IP whitelist
         if not self._is_ip_allowed(client_ip):
-            _LOGGER.warning("🚫 Blocked WebSocket connection from unauthorized IP: %s", client_ip)
+            _LOGGER.warning(
+                "🚫 Blocked WebSocket connection from unauthorized IP: %s", client_ip
+            )
             return web.Response(status=403, text="Forbidden: IP not authorized")
 
         ws = web.WebSocketResponse()
@@ -407,14 +451,23 @@ class MCPServer:
                             response = await self.process_mcp_message(data)
                             await ws.send_str(json.dumps(response))
                     except json.JSONDecodeError:
-                        await ws.send_str(json.dumps({
-                            "error": {"code": -32700, "message": "Parse error"}
-                        }))
+                        await ws.send_str(
+                            json.dumps(
+                                {"error": {"code": -32700, "message": "Parse error"}}
+                            )
+                        )
                     except Exception as err:
                         _LOGGER.exception("Error processing MCP message")
-                        await ws.send_str(json.dumps({
-                            "error": {"code": -32000, "message": f"Server error: {err}"}
-                        }))
+                        await ws.send_str(
+                            json.dumps(
+                                {
+                                    "error": {
+                                        "code": -32000,
+                                        "message": f"Server error: {err}",
+                                    }
+                                }
+                            )
+                        )
                 elif msg.type == WSMsgType.ERROR:
                     _LOGGER.error("WebSocket error: %s", ws.exception())
                     break
@@ -434,14 +487,17 @@ class MCPServer:
         # Check IP whitelist
         if not self._is_ip_allowed(client_ip):
             _LOGGER.warning("🚫 Blocked MCP request from unauthorized IP: %s", client_ip)
-            return web.json_response({
-                "jsonrpc": "2.0",
-                "error": {
-                    "code": -32000,
-                    "message": "Forbidden: IP not authorized"
+            return web.json_response(
+                {
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32000,
+                        "message": "Forbidden: IP not authorized",
+                    },
+                    "id": None,
                 },
-                "id": None
-            }, status=403)
+                status=403,
+            )
 
         request_id = None
         try:
@@ -450,24 +506,30 @@ class MCPServer:
 
             # Validate JSON-RPC 2.0 format
             if "jsonrpc" not in data or data["jsonrpc"] != "2.0":
-                return web.json_response({
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32600,
-                        "message": "Invalid Request: missing or invalid jsonrpc field"
+                return web.json_response(
+                    {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32600,
+                            "message": "Invalid Request: missing or invalid jsonrpc field",
+                        },
+                        "id": request_id,
                     },
-                    "id": request_id
-                }, status=400)
+                    status=400,
+                )
 
             if "method" not in data:
-                return web.json_response({
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32600,
-                        "message": "Invalid Request: missing method field"
+                return web.json_response(
+                    {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": -32600,
+                            "message": "Invalid Request: missing method field",
+                        },
+                        "id": request_id,
                     },
-                    "id": request_id
-                }, status=400)
+                    status=400,
+                )
 
             # Check if this is a notification (no id field)
             is_notification = "id" not in data
@@ -479,29 +541,31 @@ class MCPServer:
                 # Return 204 No Content for notifications
                 return web.Response(status=204)
             else:
-                _LOGGER.debug("📋 MCP method: %s (id: %s)", data.get("method"), request_id)
+                _LOGGER.debug(
+                    "📋 MCP method: %s (id: %s)", data.get("method"), request_id
+                )
                 response = await self.process_mcp_message(data)
                 return web.json_response(response)
 
         except json.JSONDecodeError:
-            return web.json_response({
-                "jsonrpc": "2.0",
-                "error": {
-                    "code": -32700,
-                    "message": "Parse error: invalid JSON"
+            return web.json_response(
+                {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32700, "message": "Parse error: invalid JSON"},
+                    "id": None,
                 },
-                "id": None
-            }, status=400)
+                status=400,
+            )
         except Exception as err:
             _LOGGER.exception("Error processing MCP request")
-            return web.json_response({
-                "jsonrpc": "2.0",
-                "error": {
-                    "code": -32603,
-                    "message": f"Internal error: {str(err)}"
+            return web.json_response(
+                {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32603, "message": f"Internal error: {str(err)}"},
+                    "id": request_id,
                 },
-                "id": request_id
-            }, status=500)
+                status=500,
+            )
 
     async def process_mcp_notification(self, data: Dict[str, Any]) -> None:
         """Process MCP notification (no response expected)."""
@@ -526,16 +590,15 @@ class MCPServer:
         except Exception as err:
             _LOGGER.exception("Error processing notification %s: %s", method, err)
 
-    async def broadcast_notification(self, method: str, params: Dict[str, Any] | None = None) -> None:
+    async def broadcast_notification(
+        self, method: str, params: Dict[str, Any] | None = None
+    ) -> None:
         """Send notification to all SSE clients."""
         if not self.sse_clients:
             _LOGGER.debug("No SSE clients to notify for %s", method)
             return
 
-        notification = {
-            "jsonrpc": "2.0",
-            "method": method
-        }
+        notification = {"jsonrpc": "2.0", "method": method}
         if params:
             notification["params"] = params
 
@@ -575,19 +638,12 @@ class MCPServer:
             else:
                 return {
                     "jsonrpc": "2.0",
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method not found: {method}"
-                    },
-                    "id": msg_id
+                    "error": {"code": -32601, "message": f"Method not found: {method}"},
+                    "id": msg_id,
                 }
 
             # Always include jsonrpc and id in successful responses
-            response = {
-                "jsonrpc": "2.0",
-                "result": result,
-                "id": msg_id
-            }
+            response = {"jsonrpc": "2.0", "result": result, "id": msg_id}
 
             return response
 
@@ -597,9 +653,9 @@ class MCPServer:
                 "jsonrpc": "2.0",
                 "error": {
                     "code": -32603,
-                    "message": f"Internal error in {method}: {str(err)}"
+                    "message": f"Internal error in {method}: {str(err)}",
                 },
-                "id": msg_id
+                "id": msg_id,
             }
 
     async def handle_initialize(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -612,10 +668,7 @@ class MCPServer:
                     "listChanged": True  # Tell client that tools can change dynamically
                 }
             },
-            "serverInfo": {
-                "name": MCP_SERVER_NAME,
-                "version": "0.1.0"
-            }
+            "serverInfo": {"name": MCP_SERVER_NAME, "version": "0.1.0"},
         }
 
     async def handle_tools_list(self) -> Dict[str, Any]:
@@ -632,48 +685,48 @@ class MCPServer:
                     "properties": {
                         "entity_type": {
                             "type": "string",
-                            "description": "Type of entity to find (e.g., 'light', 'switch', 'sensor', 'climate')"
+                            "description": "Type of entity to find (e.g., 'light', 'switch', 'sensor', 'climate')",
                         },
                         "area": {
                             "type": "string",
-                            "description": "Area/room name to search in - use exact names from the areas list provided in your system context (e.g., 'Kitchen', 'Back Garden', 'Living Room')"
+                            "description": "Area/room name to search in - use exact names from the areas list provided in your system context (e.g., 'Kitchen', 'Back Garden', 'Living Room')",
                         },
                         "domain": {
                             "type": "string",
-                            "description": "Home Assistant domain to filter by (e.g., 'light', 'switch', 'climate', 'sensor')"
+                            "description": "Home Assistant domain to filter by (e.g., 'light', 'switch', 'climate', 'sensor')",
                         },
                         "state": {
                             "type": "string",
-                            "description": "Current state to filter by (e.g., 'on', 'off', 'unavailable')"
+                            "description": "Current state to filter by (e.g., 'on', 'off', 'unavailable')",
                         },
                         "name_contains": {
                             "type": "string",
-                            "description": "Text that entity name should contain (case-insensitive)"
+                            "description": "Text that entity name should contain (case-insensitive)",
                         },
                         "device_class": {
                             "oneOf": [
                                 {"type": "string"},
-                                {"type": "array", "items": {"type": "string"}}
+                                {"type": "array", "items": {"type": "string"}},
                             ],
-                            "description": "Device class to filter by (e.g., 'temperature', 'motion', 'door', 'moisture'). Can be a single string or array of strings for OR logic. Check the index for available device classes per domain."
+                            "description": "Device class to filter by (e.g., 'temperature', 'motion', 'door', 'moisture'). Can be a single string or array of strings for OR logic. Check the index for available device classes per domain.",
                         },
                         "name_pattern": {
                             "type": "string",
-                            "description": "Wildcard pattern to match entity IDs (e.g., '*_person_detected', 'sensor.*_ble_area'). Supports * for any characters."
+                            "description": "Wildcard pattern to match entity IDs (e.g., '*_person_detected', 'sensor.*_ble_area'). Supports * for any characters.",
                         },
                         "inferred_type": {
                             "type": "string",
-                            "description": "Inferred entity type from the index (e.g., 'person_detection', 'location_tracking'). The pattern will be looked up from the index's inferred_types. Check get_index() to see available inferred types."
+                            "description": "Inferred entity type from the index (e.g., 'person_detection', 'location_tracking'). The pattern will be looked up from the index's inferred_types. Check get_index() to see available inferred types.",
                         },
                         "limit": {
                             "type": "integer",
                             "description": "Maximum number of entities to return (default: 20, max: 50)",
-                            "default": 20
-                        }
+                            "default": 20,
+                        },
                     },
                     "required": [],
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "get_entity_details",
@@ -685,12 +738,12 @@ class MCPServer:
                         "entity_ids": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "List of entity IDs to get details for"
+                            "description": "List of entity IDs to get details for",
                         }
                     },
                     "required": ["entity_ids"],
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "list_areas",
@@ -700,8 +753,8 @@ class MCPServer:
                     "type": "object",
                     "properties": {},
                     "required": [],
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "list_domains",
@@ -711,8 +764,8 @@ class MCPServer:
                     "type": "object",
                     "properties": {},
                     "required": [],
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "get_index",
@@ -722,8 +775,8 @@ class MCPServer:
                     "type": "object",
                     "properties": {},
                     "required": [],
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "perform_action",
@@ -734,11 +787,11 @@ class MCPServer:
                     "properties": {
                         "domain": {
                             "type": "string",
-                            "description": "The domain of the service to call (e.g., 'light', 'switch', 'climate', 'vacuum', 'media_player', etc.)"
+                            "description": "The domain of the service to call (e.g., 'light', 'switch', 'climate', 'vacuum', 'media_player', etc.)",
                         },
                         "action": {
                             "type": "string",
-                            "description": "The service action (e.g., 'turn_on', 'turn_off', 'toggle', 'set_temperature')"
+                            "description": "The service action (e.g., 'turn_on', 'turn_off', 'toggle', 'set_temperature')",
                         },
                         "target": {
                             "type": "object",
@@ -747,37 +800,37 @@ class MCPServer:
                                 "entity_id": {
                                     "oneOf": [
                                         {"type": "string"},
-                                        {"type": "array", "items": {"type": "string"}}
+                                        {"type": "array", "items": {"type": "string"}},
                                     ],
-                                    "description": "Single entity ID or list of entity IDs"
+                                    "description": "Single entity ID or list of entity IDs",
                                 },
                                 "area_id": {
                                     "oneOf": [
                                         {"type": "string"},
-                                        {"type": "array", "items": {"type": "string"}}
+                                        {"type": "array", "items": {"type": "string"}},
                                     ],
-                                    "description": "Single area ID or list of area IDs"
+                                    "description": "Single area ID or list of area IDs",
                                 },
                                 "device_id": {
                                     "oneOf": [
                                         {"type": "string"},
-                                        {"type": "array", "items": {"type": "string"}}
+                                        {"type": "array", "items": {"type": "string"}},
                                     ],
-                                    "description": "Single device ID or list of device IDs"
-                                }
+                                    "description": "Single device ID or list of device IDs",
+                                },
                             },
                             "minProperties": 1,
-                            "additionalProperties": False
+                            "additionalProperties": False,
                         },
                         "data": {
                             "type": "object",
                             "description": "Additional parameters for the service (e.g., brightness: 50, temperature: 22)",
-                            "additionalProperties": True
-                        }
+                            "additionalProperties": True,
+                        },
                     },
                     "required": ["domain", "action", "target"],
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "set_conversation_state",
@@ -788,12 +841,12 @@ class MCPServer:
                     "properties": {
                         "expecting_response": {
                             "type": "boolean",
-                            "description": "true if expecting user response, false if task is complete"
+                            "description": "true if expecting user response, false if task is complete",
                         }
                     },
                     "required": ["expecting_response"],
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "run_script",
@@ -804,22 +857,22 @@ class MCPServer:
                     "properties": {
                         "script_id": {
                             "type": "string",
-                            "description": "The script entity ID (e.g., 'script.llm_camera_analysis' or just 'llm_camera_analysis')"
+                            "description": "The script entity ID (e.g., 'script.llm_camera_analysis' or just 'llm_camera_analysis')",
                         },
                         "variables": {
                             "type": "object",
                             "description": "Variables to pass to the script",
-                            "additionalProperties": True
+                            "additionalProperties": True,
                         },
                         "timeout": {
                             "type": "integer",
                             "description": "Timeout in seconds (default: 60)",
-                            "default": 60
-                        }
+                            "default": 60,
+                        },
                     },
                     "required": ["script_id"],
-                    "additionalProperties": False
-                }
+                    "additionalProperties": False,
+                },
             },
             {
                 "name": "run_automation",
@@ -830,23 +883,53 @@ class MCPServer:
                     "properties": {
                         "automation_id": {
                             "type": "string",
-                            "description": "The automation entity ID (e.g., 'automation.notify_on_motion' or just 'notify_on_motion')"
+                            "description": "The automation entity ID (e.g., 'automation.notify_on_motion' or just 'notify_on_motion')",
                         },
                         "variables": {
                             "type": "object",
                             "description": "Variables to pass to the automation (available as trigger.variables)",
-                            "additionalProperties": True
+                            "additionalProperties": True,
                         },
                         "skip_conditions": {
                             "type": "boolean",
                             "description": "Whether to skip the automation's conditions (default: false)",
-                            "default": False
-                        }
+                            "default": False,
+                        },
                     },
                     "required": ["automation_id"],
-                    "additionalProperties": False
-                }
-            }
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "name": "get_entity_history",
+                "description": "Get historical state changes for a specific entity over a time period. Shows when the entity changed state with timestamps. Useful for answering questions like 'when did the front door open?' or 'what time did the temperature change?'",
+                "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                        "entity_id": {
+                            "type": "string",
+                            "description": "The entity ID to get history for (e.g., 'binary_sensor.front_door', 'sensor.temperature')",
+                        },
+                        "hours": {
+                            "type": "integer",
+                            "description": "Number of hours of history to retrieve (default: 24, max: 168 for 1 week)",
+                            "default": 24,
+                            "minimum": 1,
+                            "maximum": 168,
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of state changes to return (default: 50, max: 100). Most recent changes shown first.",
+                            "default": 50,
+                            "minimum": 1,
+                            "maximum": 100,
+                        },
+                    },
+                    "required": ["entity_id"],
+                    "additionalProperties": False,
+                },
+            },
         ]
 
         # Add custom tool definitions if enabled
@@ -885,6 +968,8 @@ class MCPServer:
             return await self.tool_run_script(arguments)
         elif tool_name == "run_automation":
             return await self.tool_run_automation(arguments)
+        elif tool_name == "get_entity_history":
+            return await self.tool_get_entity_history(arguments)
         else:
             # Check if it's a custom tool
             if self.custom_tools and self.custom_tools.is_custom_tool(tool_name):
@@ -895,7 +980,12 @@ class MCPServer:
     async def tool_discover_entities(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Discover entities based on criteria with progress notifications."""
         # Notify start
-        self.publish_progress("tool_start", "Starting entity discovery", tool="discover_entities", args=args)
+        self.publish_progress(
+            "tool_start",
+            "Starting entity discovery",
+            tool="discover_entities",
+            args=args,
+        )
 
         entities = await self.discovery.discover_entities(
             entity_type=args.get("entity_type"),
@@ -914,20 +1004,24 @@ class MCPServer:
             "tool_complete",
             f"Discovery complete: found {len(entities)} entities",
             tool="discover_entities",
-            count=len(entities)
+            count=len(entities),
         )
 
         # Format results based on whether it's smart discovery or general
         return self._format_discovery_results(entities, args)
 
-    def _format_discovery_results(self, entities: List[Dict[str, Any]], args: Dict[str, Any]) -> Dict[str, Any]:
+    def _format_discovery_results(
+        self, entities: List[Dict[str, Any]], args: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Format discovery results for the LLM, handling both smart and general discovery."""
         if not entities:
             return {
-                "content": [{
-                    "type": "text",
-                    "text": "No entities found matching the search criteria."
-                }]
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "No entities found matching the search criteria.",
+                    }
+                ]
             }
 
         # Check if this is a smart discovery result (has summary metadata)
@@ -966,8 +1060,12 @@ class MCPServer:
             if primary:
                 text_parts.append("\n📍 Primary Entities:")
                 for entity in primary:
-                    type_desc = f" ({entity.get('type', '')})" if entity.get('type') else ""
-                    text_parts.append(f"  • {entity['entity_id']}: {entity['name']} - {entity['state']}{type_desc}")
+                    type_desc = (
+                        f" ({entity.get('type', '')})" if entity.get("type") else ""
+                    )
+                    text_parts.append(
+                        f"  • {entity['entity_id']}: {entity['name']} - {entity['state']}{type_desc}"
+                    )
 
             # Group related entities by category
             if related:
@@ -982,45 +1080,30 @@ class MCPServer:
                     cat_name = category.replace("_", " ").title()
                     text_parts.append(f"\n  {cat_name}:")
                     for entity in cat_entities:
-                        area = f" @ {entity.get('area')}" if entity.get('area') else ""
-                        text_parts.append(f"    • {entity['entity_id']}: {entity['state']}{area}")
+                        area = f" @ {entity.get('area')}" if entity.get("area") else ""
+                        text_parts.append(
+                            f"    • {entity['entity_id']}: {entity['state']}{area}"
+                        )
 
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": "\n".join(text_parts)
-                }]
-            }
+            return {"content": [{"type": "text", "text": "\n".join(text_parts)}]}
         else:
             # General discovery - simple list
             text_parts = [f"Found {len(entities)} entities:"]
 
             for entity in entities:
-                area = entity.get('area', 'None')
+                area = entity.get("area", "None")
                 text_parts.append(
                     f"- {entity['entity_id']}: {entity['name']} (State: {entity['state']}, Area: {area})"
                 )
 
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": "\n".join(text_parts)
-                }]
-            }
+            return {"content": [{"type": "text", "text": "\n".join(text_parts)}]}
 
     async def tool_get_entity_details(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Get detailed information about specific entities."""
         entity_ids = args.get("entity_ids", [])
         details = await self.discovery.get_entity_details(entity_ids)
 
-        return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": json.dumps(details, indent=2)
-                }
-            ]
-        }
+        return {"content": [{"type": "text", "text": json.dumps(details, indent=2)}]}
 
     async def tool_list_areas(self) -> Dict[str, Any]:
         """List all areas."""
@@ -1030,11 +1113,13 @@ class MCPServer:
             "content": [
                 {
                     "type": "text",
-                    "text": f"Available areas ({len(areas)}):\n" +
-                           "\n".join([
-                               f"- {area['name']}: {area['entity_count']} entities"
-                               for area in areas
-                           ])
+                    "text": f"Available areas ({len(areas)}):\n"
+                    + "\n".join(
+                        [
+                            f"- {area['name']}: {area['entity_count']} entities"
+                            for area in areas
+                        ]
+                    ),
                 }
             ]
         }
@@ -1043,7 +1128,7 @@ class MCPServer:
         """List all domains with entity counts and support status."""
         # Get domains that have entities in this HA instance
         entity_domains = await self.discovery.list_domains()
-        entity_domain_map = {d['domain']: d['count'] for d in entity_domains}
+        entity_domain_map = {d["domain"]: d["count"] for d in entity_domains}
 
         # Get all supported domains from registry
         supported_domains = get_supported_domains()
@@ -1056,14 +1141,22 @@ class MCPServer:
         # Show domains with entities
         result_text += "📊 Domains with entities in your system:\n"
         for domain in entity_domains:
-            support_status = "✅" if domain['domain'] in supported_domains else "⚠️"
-            result_text += f"  {support_status} {domain['domain']}: {domain['count']} entities\n"
+            support_status = "✅" if domain["domain"] in supported_domains else "⚠️"
+            result_text += (
+                f"  {support_status} {domain['domain']}: {domain['count']} entities\n"
+            )
 
         # Show supported domains without entities
         result_text += "\n🔧 Additional supported domains (no entities found):\n"
         for domain in supported_domains:
             if domain not in entity_domain_map:
-                domain_type = "controllable" if domain in controllable_domains else "read-only" if domain in read_only_domains else "service"
+                domain_type = (
+                    "controllable"
+                    if domain in controllable_domains
+                    else "read-only"
+                    if domain in read_only_domains
+                    else "service"
+                )
                 result_text += f"  ✅ {domain} ({domain_type})\n"
 
         result_text += f"\n📈 Summary:\n"
@@ -1072,14 +1165,7 @@ class MCPServer:
         result_text += f"  - Controllable: {len(controllable_domains)}\n"
         result_text += f"  - Read-only: {len(read_only_domains)}\n"
 
-        return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": result_text
-                }
-            ]
-        }
+        return {"content": [{"type": "text", "text": result_text}]}
 
     async def tool_get_index(self) -> Dict[str, Any]:
         """Get the pre-generated system structure index."""
@@ -1093,7 +1179,7 @@ class MCPServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": "Index manager not available. This feature requires MCP Assist 0.5.0 or later."
+                        "text": "Index manager not available. This feature requires MCP Assist 0.5.0 or later.",
                     }
                 ]
             }
@@ -1102,14 +1188,7 @@ class MCPServer:
         index = await index_manager.get_index()
 
         # Format as JSON for structured consumption
-        return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": json.dumps(index, indent=2)
-                }
-            ]
-        }
+        return {"content": [{"type": "text", "text": json.dumps(index, indent=2)}]}
 
     async def tool_perform_action(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Perform an action on Home Assistant entities with progress notifications."""
@@ -1126,7 +1205,7 @@ class MCPServer:
             f"Performing action: {domain}.{action}",
             tool="perform_action",
             domain=domain,
-            action=action
+            action=action,
         )
 
         # Validate the service and get the correct service name
@@ -1135,14 +1214,7 @@ class MCPServer:
         except ValueError as err:
             error_msg = str(err)
             _LOGGER.error(f"Service validation error: {error_msg}")
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"❌ Error: {error_msg}"
-                    }
-                ]
-            }
+            return {"content": [{"type": "text", "text": f"❌ Error: {error_msg}"}]}
 
         # Resolve target (convert areas to entity_ids if needed)
         try:
@@ -1151,14 +1223,7 @@ class MCPServer:
         except Exception as err:
             error_msg = f"Failed to resolve target: {err}"
             _LOGGER.error(error_msg)
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"❌ Error: {error_msg}"
-                    }
-                ]
-            }
+            return {"content": [{"type": "text", "text": f"❌ Error: {error_msg}"}]}
 
         try:
             # Prepare service data
@@ -1170,7 +1235,7 @@ class MCPServer:
                 service=service,  # Use the mapped service name
                 service_data=service_data,
                 blocking=True,  # Wait for completion
-                return_response=False
+                return_response=False,
             )
 
             # Wait briefly for state to update
@@ -1181,7 +1246,7 @@ class MCPServer:
                 "tool_complete",
                 f"Action completed: {domain}.{service}",
                 tool="perform_action",
-                success=True
+                success=True,
             )
 
             # Check new states if we have entity_ids
@@ -1204,40 +1269,27 @@ class MCPServer:
                 if states_info:
                     result_text += "\n\nNew states:\n" + "\n".join(states_info)
 
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": result_text
-                    }
-                ]
-            }
+            return {"content": [{"type": "text", "text": result_text}]}
 
         except Exception as err:
             error_msg = f"Service call failed: {err}"
             _LOGGER.exception(error_msg)
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"❌ Error: {error_msg}"
-                    }
-                ]
-            }
+            return {"content": [{"type": "text", "text": f"❌ Error: {error_msg}"}]}
 
     async def tool_set_conversation_state(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Set whether the assistant expects a user response."""
         expecting_response = args.get("expecting_response", False)
 
         # Log the state for debugging
-        _LOGGER.info(f"🔄 Conversation state set: expecting_response={expecting_response}")
+        _LOGGER.info(
+            f"🔄 Conversation state set: expecting_response={expecting_response}"
+        )
 
         # Return a marker that the agent can detect
         return {
-            "content": [{
-                "type": "text",
-                "text": f"conversation_state:{expecting_response}"
-            }]
+            "content": [
+                {"type": "text", "text": f"conversation_state:{expecting_response}"}
+            ]
         }
 
     async def tool_run_script(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -1257,7 +1309,7 @@ class MCPServer:
             "tool_start",
             f"Running script: {full_script_id}",
             tool="run_script",
-            script_id=full_script_id
+            script_id=full_script_id,
         )
 
         try:
@@ -1271,7 +1323,7 @@ class MCPServer:
                     blocking=True,
                     return_response=True,
                 ),
-                timeout=timeout
+                timeout=timeout,
             )
 
             # Notify completion
@@ -1279,7 +1331,7 @@ class MCPServer:
                 "tool_complete",
                 f"Script completed: {full_script_id}",
                 tool="run_script",
-                success=True
+                success=True,
             )
 
             # Format the response
@@ -1289,39 +1341,21 @@ class MCPServer:
             if response:
                 result_text += f"\n\nResponse:\n{json.dumps(response, indent=2)}"
                 return {
-                    "content": [{
-                        "type": "text",
-                        "text": result_text
-                    }],
-                    "response": response
+                    "content": [{"type": "text", "text": result_text}],
+                    "response": response,
                 }
             else:
                 result_text += "\n\nNo response variables returned (script may not have response_variable defined)"
-                return {
-                    "content": [{
-                        "type": "text",
-                        "text": result_text
-                    }]
-                }
+                return {"content": [{"type": "text", "text": result_text}]}
 
         except asyncio.TimeoutError:
             error_msg = f"Script execution timed out after {timeout} seconds"
             _LOGGER.error(f"❌ {error_msg}: {full_script_id}")
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": f"❌ Error: {error_msg}"
-                }]
-            }
+            return {"content": [{"type": "text", "text": f"❌ Error: {error_msg}"}]}
         except Exception as err:
             error_msg = f"Script execution failed: {err}"
             _LOGGER.exception(f"❌ {error_msg}")
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": f"❌ Error: {error_msg}"
-                }]
-            }
+            return {"content": [{"type": "text", "text": f"❌ Error: {error_msg}"}]}
 
     async def tool_run_automation(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Trigger a Home Assistant automation with optional variables."""
@@ -1333,14 +1367,16 @@ class MCPServer:
         if not automation_id.startswith("automation."):
             automation_id = f"automation.{automation_id}"
 
-        _LOGGER.info(f"🤖 Triggering automation: {automation_id} with variables: {variables}, skip_conditions: {skip_conditions}")
+        _LOGGER.info(
+            f"🤖 Triggering automation: {automation_id} with variables: {variables}, skip_conditions: {skip_conditions}"
+        )
 
         # Notify start
         self.publish_progress(
             "tool_start",
             f"Triggering automation: {automation_id}",
             tool="run_automation",
-            automation_id=automation_id
+            automation_id=automation_id,
         )
 
         try:
@@ -1361,29 +1397,131 @@ class MCPServer:
                 "tool_complete",
                 f"Automation triggered: {automation_id}",
                 tool="run_automation",
-                success=True
+                success=True,
             )
 
             result_text = f"✅ Automation {automation_id} triggered successfully"
             if skip_conditions:
                 result_text += " (conditions skipped)"
 
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": result_text
-                }]
-            }
+            return {"content": [{"type": "text", "text": result_text}]}
 
         except Exception as err:
             error_msg = f"Automation trigger failed: {err}"
             _LOGGER.exception(f"❌ {error_msg}")
+            return {"content": [{"type": "text", "text": f"❌ Error: {error_msg}"}]}
+
+    async def tool_get_entity_history(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Get entity history with human-readable formatting."""
+        entity_id = args.get("entity_id")
+        hours = min(args.get("hours", 24), 168)  # Max 1 week
+        limit = min(args.get("limit", 50), 100)  # Max 100 changes
+
+        _LOGGER.info(f"📜 Getting history for {entity_id}: {hours} hours, limit {limit}")
+
+        # Notify start
+        self.publish_progress(
+            "tool_start",
+            f"Retrieving history for {entity_id}",
+            tool="get_entity_history",
+            entity_id=entity_id,
+        )
+
+        # 1. Get current state
+        current_state = self.hass.states.get(entity_id)
+        if not current_state:
             return {
-                "content": [{
-                    "type": "text",
-                    "text": f"❌ Error: {error_msg}"
-                }]
+                "content": [
+                    {"type": "text", "text": f"Entity '{entity_id}' not found."}
+                ]
             }
+
+        friendly_name = current_state.attributes.get("friendly_name", entity_id)
+
+        # 2. Calculate time range (UTC)
+        end_time = dt_util.utcnow()
+        start_time = end_time - timedelta(hours=hours)
+
+        # 3. Query history (run in executor to avoid blocking)
+        try:
+            states = await self.hass.async_add_executor_job(
+                history.state_changes_during_period,
+                self.hass,
+                start_time,
+                end_time,
+                entity_id,
+                True,  # include_start_time_state
+                True,  # no_attributes (performance)
+            )
+            entity_states = states.get(entity_id, [])
+        except Exception as e:
+            _LOGGER.error(f"Failed to get history for {entity_id}: {e}")
+            return {
+                "content": [
+                    {"type": "text", "text": f"Failed to retrieve history: {str(e)}"}
+                ]
+            }
+
+        # Notify completion
+        self.publish_progress(
+            "tool_complete",
+            f"History retrieved: {len(entity_states)} changes",
+            tool="get_entity_history",
+            success=True,
+        )
+
+        # 4. Format history (most recent first, limited)
+        if not entity_states:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"{friendly_name} ({entity_id})\nCurrent state: {current_state.state}\n\nNo history available for the last {hours} hours.",
+                    }
+                ]
+            }
+
+        # Reverse to get most recent first, apply limit
+        recent_states = list(reversed(entity_states[-limit:]))
+
+        # Build formatted text
+        text_parts = [
+            f"{friendly_name} ({entity_id})",
+            f"Current state: {current_state.state}",
+            "",
+            f"Recent history (last {hours} hours):",
+        ]
+
+        now = dt_util.utcnow()
+        for state in recent_states:
+            # Calculate relative time
+            time_diff = now - state.last_changed
+            seconds = time_diff.total_seconds()
+
+            if seconds < 60:
+                relative = "just now"
+            elif seconds < 3600:
+                minutes = int(seconds / 60)
+                relative = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+            elif seconds < 86400:
+                hours_ago = int(seconds / 3600)
+                relative = f"{hours_ago} hour{'s' if hours_ago != 1 else ''} ago"
+            else:
+                days = int(seconds / 86400)
+                relative = f"{days} day{'s' if days != 1 else ''} ago"
+
+            # Absolute timestamp
+            absolute = state.last_changed.strftime("%H:%M:%S")
+
+            # Format line
+            text_parts.append(f"• {relative} ({absolute}) → {state.state}")
+
+        text_parts.append("")
+        text_parts.append(
+            f"Showing {len(recent_states)} change{'s' if len(recent_states) != 1 else ''}"
+        )
+
+        return {"content": [{"type": "text", "text": "\n".join(text_parts)}]}
 
     def validate_service(self, domain: str, action: str) -> str:
         """Validate that a domain/action combination is allowed.
@@ -1396,7 +1534,9 @@ class MCPServer:
         """
         valid, result = validate_domain_action(domain, action)
         if valid:
-            _LOGGER.debug(f"Validated service: {domain}.{result} (from action: {action})")
+            _LOGGER.debug(
+                f"Validated service: {domain}.{result} (from action: {action})"
+            )
             return result  # Returns the correct service name
         else:
             _LOGGER.warning(f"Service validation failed: {result}")

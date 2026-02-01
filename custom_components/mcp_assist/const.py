@@ -133,6 +133,7 @@ DEFAULT_TECHNICAL_PROMPT = """You are controlling a Home Assistant smart home sy
 - **discover_entities**: find devices by name/area/domain/device_class/state (ALWAYS use first)
 - **perform_action**: control devices using discovered entity IDs
 - **get_entity_details**: check states using discovered entity IDs
+- **get_entity_history**: get historical state changes for an entity (answers "when did X happen?")
 - **list_areas/list_domains**: list available areas and device types
 - **run_script**: execute scripts that return data (e.g., camera analysis, calculations)
 - **run_automation**: trigger automations manually
