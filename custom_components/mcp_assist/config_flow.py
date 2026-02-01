@@ -144,9 +144,13 @@ async def fetch_models_from_openai(
     try:
         timeout = aiohttp.ClientTimeout(total=10)
         headers = {
-            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+
+        # Only include Authorization header if API key looks valid
+        # Some custom OpenAI-compatible services don't require authentication
+        if api_key and len(api_key) > 5 and not api_key.lower() in ["none", "null", "fake", "na", "n/a"]:
+            headers["Authorization"] = f"Bearer {api_key}"
 
         async with aiohttp.ClientSession(timeout=timeout) as session:
             _LOGGER.info("📡 FETCH: Requesting OpenAI models")
@@ -166,8 +170,15 @@ async def fetch_models_from_openai(
                 data = await resp.json()
                 # Filter for chat models only (exclude embeddings, whisper, etc.)
                 all_models = [m.get("id", "") for m in data.get("data", [])]
-                # Only include GPT models suitable for chat
-                chat_models = [m for m in all_models if m.startswith("gpt-")]
+
+                # Only filter for GPT models when using official OpenAI URL
+                # Custom OpenAI-compatible services may use different naming schemes
+                if base_url == OPENAI_BASE_URL:
+                    chat_models = [m for m in all_models if m.startswith("gpt-")]
+                else:
+                    # For custom URLs, return all models (user's service defines what's available)
+                    chat_models = all_models
+
                 sorted_models = sorted(chat_models, reverse=True) if chat_models else []
                 _LOGGER.info("✨ FETCH: Found %d OpenAI chat models", len(sorted_models))
                 return sorted_models

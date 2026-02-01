@@ -1444,7 +1444,11 @@ class MCPAssistConversationEntity(ConversationEntity):
         """Get authentication headers based on server type."""
         if self.server_type == SERVER_TYPE_OPENAI:
             # OpenAI uses Bearer token
-            return {"Authorization": f"Bearer {self.api_key}"}
+            # For custom OpenAI-compatible URLs, only send auth if key looks valid
+            if self.api_key and len(self.api_key) > 5 and not self.api_key.lower() in ["none", "null", "fake", "na", "n/a"]:
+                return {"Authorization": f"Bearer {self.api_key}"}
+            else:
+                return {}  # No auth for custom services that don't require it
         elif self.server_type == SERVER_TYPE_GEMINI:
             # Gemini OpenAI-compatible endpoint uses Bearer token like OpenAI
             return {"Authorization": f"Bearer {self.api_key}"}
