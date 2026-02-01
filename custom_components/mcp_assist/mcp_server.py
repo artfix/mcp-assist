@@ -1197,6 +1197,27 @@ class MCPServer:
         target = args.get("target", {})
         data = args.get("data", {})
 
+        # Validate required parameters
+        if not domain:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "❌ Error: Missing required parameter 'domain'. Use discover_entities to find the correct domain.",
+                    }
+                ]
+            }
+
+        if not action:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "❌ Error: Missing required parameter 'action'. Common actions: turn_on, turn_off, toggle.",
+                    }
+                ]
+            }
+
         _LOGGER.info(f"🎯 Performing action: {domain}.{action} on {target}")
 
         # Notify start
@@ -1224,6 +1245,17 @@ class MCPServer:
             error_msg = f"Failed to resolve target: {err}"
             _LOGGER.error(error_msg)
             return {"content": [{"type": "text", "text": f"❌ Error: {error_msg}"}]}
+
+        # Reject deprecated color_temp parameter
+        if domain == "light" and "color_temp" in data:
+            _LOGGER.warning(
+                f"❌ Rejecting deprecated color_temp parameter: {data.get('color_temp')}"
+            )
+            raise ValueError(
+                "color_temp is deprecated. Use color_temp_kelvin instead. "
+                "Examples: 2700 (warm white), 4000 (neutral white), 6500 (cool white). "
+                "Lower Kelvin values = warmer light, higher Kelvin values = cooler light."
+            )
 
         try:
             # Prepare service data

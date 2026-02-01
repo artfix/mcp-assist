@@ -1317,7 +1317,13 @@ class MCPAssistConversationEntity(ConversationEntity):
 
                 # Format result for OpenAI
                 if "error" in result:
-                    content = json.dumps({"error": result["error"]})
+                    # Extract error message as plain text so LLM actually reads it
+                    error_data = result["error"]
+                    if isinstance(error_data, dict):
+                        error_msg = error_data.get("message", str(error_data))
+                    else:
+                        error_msg = str(error_data)
+                    content = f"ERROR: {error_msg}"
                 else:
                     content = result.get("result", "")
 
